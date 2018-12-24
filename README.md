@@ -84,6 +84,17 @@ The infintesimals dt and dx will be model constants, based on the timestepping a
 
 This leaves us with density, pressure, and velocity as our state.
 
+https://en.wikipedia.org/wiki/Euler_equations_(fluid_dynamics)#Euler_equations
+
+Actually we're basically solving the euler equations
+
+We want to start with moving a tracer so we don't have to deal with changing pressure or velocity. 
+We can add water vapor as a tracer, to be advected with the velocity.
+That means we also need the advection equations.
+https://en.wikipedia.org/wiki/Advection#The_advection_equation
+
+Advection equations are part of the material derivative.
+
 
 
 
