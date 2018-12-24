@@ -113,6 +113,11 @@ backwards difference: change every dA/dx into (A(x) - A(x-h)) / (h) where h is t
 central difference: change every dA/dx into (A(x+h) - A(x-h)) / (2 * h) where h is the change in x and A is the function
 
 
+Do that with all partial derivatives, including gradient.
+
+
+
+
 
 
 
