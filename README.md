@@ -47,13 +47,15 @@ General architecture for any of these problems:
 
 2. Define needed states, required global constants, and model constants.
 
-2. Set initial conditions and boundary conditions
+3. find all PDEs and determine how they will be discretized.
 
-3. do timestep and return new state
+4. Set initial conditions and boundary conditions
 
-4. log state if needed
+5. do timestep and return new state
 
-5. go to 3 if not in final state
+6. log state if needed
+
+7. go to 3 if not in final state
 
 
 So, we need initial conditions, a final state test, a state definition, boundary conditions, and logging.
@@ -61,6 +63,7 @@ So, we need initial conditions, a final state test, a state definition, boundary
 State definition is straightforward
 
 State is anything that changes over a timestep that cannot be easily recomputed from the previous state.
+(basically it's a partial with respect to time)
 
 We need global constants and model constants. Global constants are based on physical laws. Model constants are constant for the model (like grid, dimensions, geography, forcings, etc).
 
@@ -73,7 +76,7 @@ Parameters of this formula are:
 * density
 * pressure
 * change in time (in the Dt term)
-* change in dimensions (for gradient terms)
+* change in space (for gradient terms)
 * viscosity
 * gravity
 
@@ -94,6 +97,24 @@ That means we also need the advection equations.
 https://en.wikipedia.org/wiki/Advection#The_advection_equation
 
 Advection equations are part of the material derivative.
+
+Finite differences will be used to solve the equations at first
+
+https://en.wikipedia.org/wiki/Finite_difference
+
+change in time will be forward difference
+
+for first try, change in space will be forward difference too.
+
+forward difference: change every dA/dx into (A(x+h) - A(x)) / (h) where h is the change in x and A is the function
+
+backwards difference: change every dA/dx into (A(x) - A(x-h)) / (h) where h is the change in x and A is the function
+
+central difference: change every dA/dx into (A(x+h) - A(x-h)) / (2 * h) where h is the change in x and A is the function
+
+
+
+
 
 
 
