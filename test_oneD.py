@@ -3,7 +3,7 @@ import numpy as np
 import unittest
 
 from oneD import VectorField, ScalarField, Equation, MaterialDerivative, Divergence, Gradient, Differential
-from constants import ureg
+from constants import units
 
 
 def setUpModule():
@@ -47,13 +47,13 @@ class TestOneD(unittest.TestCase):
 
         world_shape = (16,)
 
-        V = VectorField(np.zeros(world_shape) * ureg.meters / ureg.second)
+        V = VectorField(np.zeros(world_shape) * units.meters / units.second)
 
-        p = ScalarField(np.zeros(world_shape) * ureg.pascals)
+        p = ScalarField(np.zeros(world_shape) * units.pascals)
 
-        rho = ScalarField(np.zeros(world_shape) * ureg.kg / ureg.meters ** 3)
+        rho = ScalarField(np.zeros(world_shape) * units.kg / units.meters ** 3)
 
-        dt = Differential(1 * ureg.seconds)
+        dt = Differential(1 * units.seconds)
 
         # conservation of momentum
 

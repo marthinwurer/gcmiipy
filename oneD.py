@@ -3,7 +3,7 @@ from typing import Union
 import numpy as np
 from typeguard import typechecked
 
-from constants import ureg
+from constants import units
 
 
 class Operation(object):
