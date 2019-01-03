@@ -1,35 +1,4 @@
-from itertools import count
-
 import numpy as np
-from constants import units
-
-import matplotlib
-import matplotlib.pyplot as plt
-
-# just do conservation of momentum
-
-# model constants
-
-dx = 10000 * units.m
-
-dy = 10000 * units.m
-
-dt = 900 * units.s
-
-world_shape = (160,)
-
-spatial_change = (dx,)
-
-
-# states
-
-V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
-
-p = np.zeros((*world_shape,)) * units.Pa
-
-rho = np.zeros((*world_shape,)) * units.kg * units.m ** -3
-
-q = np.zeros((*world_shape,)) * units.kg / units.kg
 
 
 # formula
@@ -44,7 +13,6 @@ def advect_1d_fd(dt, spatial_change, V, q):
     q_p_1 = unit_roll(q, -1, 0)
 
     print(q)
-
 
     difference = (q_p_1 - q)
     print(difference)
@@ -63,9 +31,141 @@ def advect_1d_fd(dt, spatial_change, V, q):
     return new
 
 
+def advect_1d_lf(dt, spatial_change, V, q, q_prev):
+    dx = spatial_change[0]
+    # have to use -1 because we're rolling the next index back to the current one
+    q_p_1 = unit_roll(q, -1, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+
+    difference = (q_p_1 - q_m_1)
+
+    mult = difference * V[0]
+    print(mult, "- Mult")
+
+    step = (dt / dx) * 2
+    print(step, "- Step")
+    finite = mult * step
+
+    print(finite)
+    new = q_prev - finite
+    print(new)
+    return new
 
 
+def upwind_spatial(spatial_change, V, q):
+    pass
 
+
+def advect_1d_upwind(dt, spatial_change, V, q):
+    dx = spatial_change[0]
+
+    q_p_1 = unit_roll(q, -1, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+
+    zeroes = np.zeros(q.shape)
+
+    a_plus = np.maximum(V[0], zeroes)
+    a_minus = np.minimum(V[0], zeroes)
+
+    fd = (q_p_1 - q)
+    bd = (q - q_m_1)
+
+    mult = (fd * a_minus + bd * a_plus) * V[0]
+    print(mult, "- Mult")
+
+    step = (dt / dx)
+    print(step, "- Step")
+    finite = mult * step
+
+    print(finite)
+    new = q - finite
+    print(new)
+    return new
+
+
+def advect_1d_upwind_second(dt, spatial_change, V, q):
+    dx = spatial_change[0]
+
+    q_p_1 = unit_roll(q, -1, 0)
+    q_p_2 = unit_roll(q, -2, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+    q_m_2 = unit_roll(q, 2, 0)
+
+    zeroes = np.zeros(q.shape)
+
+    a_plus = np.maximum(V[0], zeroes)
+    a_minus = np.minimum(V[0], zeroes)
+
+    fd = (4 * q_p_1 - 3 * q - q_p_2)
+    bd = (3 * q - 4 * q_m_1 + q_m_2)
+
+    mult = (fd * a_minus + bd * a_plus) * V[0]
+    print(mult, "- Mult")
+
+    step = (dt / dx) / 2
+    print(step, "- Step")
+    finite = mult * step
+
+    print(finite)
+    new = q - finite
+    print(new)
+    return new
+
+
+def advect_1d_upwind_third(dt, spatial_change, V, q):
+    dx = spatial_change[0]
+
+    q_p_1 = unit_roll(q, -1, 0)
+    q_p_2 = unit_roll(q, -2, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+    q_m_2 = unit_roll(q, 2, 0)
+
+    zeroes = np.zeros(q.shape)
+
+    a_plus = np.maximum(V[0], zeroes)
+    a_minus = np.minimum(V[0], zeroes)
+
+    bd = (2 * q_p_1 + 3 * q - 6 * q_m_1 + q_m_2)
+    fd = (6 * q_p_1 - 3 * q - q_p_2 - 2 * q_m_1)
+
+    mult = (fd * a_minus + bd * a_plus) * V[0]
+    print(mult, "- Mult")
+
+    step = (dt / dx) / 6
+    print(step, "- Step")
+    finite = mult * step
+
+    print(finite)
+    new = q - finite
+    print(new)
+    return new
+
+
+def advection_1d_rk4(dt, spatial_change, V, q):
+    dx = spatial_change[0]
+
+    q_p_1 = unit_roll(q, -1, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+
+    zeroes = np.zeros(q.shape)
+
+    a_plus = np.maximum(V[0], zeroes)
+    a_minus = np.minimum(V[0], zeroes)
+
+    fd = (q_p_1 - q)
+    bd = (q - q_m_1)
+
+    mult = (fd * a_minus + bd * a_plus) * V[0]
+    print(mult, "- Mult")
+
+    step = (dt / dx)
+    print(step, "- Step")
+    finite = mult * step
+
+    print(finite)
+    new = q - finite
+    print(new)
+    return new
 
 
 def advection_forward_differences(dt, spatial_change, V, q):
@@ -73,43 +173,4 @@ def advection_forward_differences(dt, spatial_change, V, q):
     if dimensions == 1:
         advect_1d_fd(dt, spatial_change, V, q)
     # for dimension, delta in enumerate(spatial_change):
-
-
-# initial conditions
-
-
-q[3:7] = 1.0
-V[0][:] = 1.0 * units.m / units.s
-# V[0][6:7] = 2.0 * units.m / units.s
-
-
-plt.ion()
-plt.figure()
-plt.plot(q)
-plt.title('Initial state')
-plt.show()
-
-
-
-# forward step the model
-
-qs = [q]
-
-q_prev = q
-
-done = False
-for i in range(30):
-    print("iteration %s" % i)
-    plt.clf()
-    plt.plot(q_prev)
-    plt.title('current_state...')
-    plt.show()
-    plt.pause(0.001)  # pause a bit so that plots are updated
-
-    q_next = advect_1d_fd(dt, spatial_change, V, q_prev)
-    qs.append(q_next)
-    q_prev = q_next
-
-plt.ioff()
-plt.show()
 
