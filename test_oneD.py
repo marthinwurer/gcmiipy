@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import unittest
 
-from just_units import advect_1d_fd, advect_1d_lf, advect_1d_upwind, advect_1d_upwind_second, advect_1d_upwind_third
-from oneD import VectorField, ScalarField, Equation, MaterialDerivative, Divergence, Gradient, Differential
+from just_units import advect_1d_fd, advect_1d_lf, advect_1d_upwind, advect_1d_upwind_second, advect_1d_upwind_third, \
+    upwind_with_spatial, ftcs_with_central, ft_with_upwind
 from constants import units
 
 
@@ -29,6 +29,7 @@ spatial_change = (dx,)
 
 num_steps = 400
 
+
 class TestOneD(unittest.TestCase):
 
     def get_initial_conditions(self):
@@ -40,9 +41,7 @@ class TestOneD(unittest.TestCase):
 
         q = np.zeros((*world_shape,)) * units.kg / units.kg
 
-
         # initial conditions
-
         q[quarter:half] = 1.0
         V[0][:] = 1.0 * units.m / units.s
 
@@ -103,6 +102,15 @@ class TestOneD(unittest.TestCase):
     def test_upwind_third(self):
         self.basic_run(advect_1d_upwind_third)
 
+    def test_upwind_spatial(self):
+        self.basic_run(upwind_with_spatial)
+
+    def test_ftcs_central(self):
+        self.basic_run(ftcs_with_central)
+
+    def test_ftcs_upwind(self):
+        self.basic_run(ft_with_upwind)
+
     def test_leapfrog(self):
         V, q = self.get_initial_conditions()
         plt.ion()
@@ -125,55 +133,4 @@ class TestOneD(unittest.TestCase):
 
         plt.ioff()
         plt.show()
-
-
-    def test_gradient(self):
-        pass
-
-    def test_finite_volume(self):
-        """
-        Goals: 1d version of primitive equations from hansen et al
-        with units
-        with finite volumes
-        start with forward euler
-        start with the basic math stuff
-
-        for finite volume method:
-            find average values in cell for conserved variables (integrate over cell volume)
-            integrate over cell surfaces
-                for each surface:
-
-        divergence integrated over volume is dot with normal of surface
-
-        so, find average value for the cell for conserved variable
-
-        interpolate to find fluxes at the edges (or use upwinding scheme to pick which fluxes to use)
-
-        use those to solve for next step
-
-        for each edge:
-            interpolate value of fluxes
-            dot product them with normal
-
-
-
-        """
-
-        world_shape = (16,)
-
-        V = VectorField(np.zeros(world_shape) * units.meters / units.second)
-
-        p = ScalarField(np.zeros(world_shape) * units.pascals)
-
-        rho = ScalarField(np.zeros(world_shape) * units.kg / units.meters ** 3)
-
-        dt = Differential(1 * units.seconds)
-
-        # conservation of momentum
-
-        conservation_of_momentum = Equation(
-            MaterialDerivative(V, dt)
-            ,
-            1 / rho * Gradient(p)
-        )
 

@@ -53,7 +53,34 @@ def advect_1d_lf(dt, spatial_change, V, q, q_prev):
 
 
 def upwind_spatial(spatial_change, V, q):
-    pass
+    # break out for method of lines: do spatial derivative, then solve for time.
+    dx = spatial_change[0]
+
+    q_p_1 = unit_roll(q, -1, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+
+    zeroes = np.zeros(q.shape)
+
+    a_plus = np.maximum(V[0], zeroes)
+    a_minus = np.minimum(V[0], zeroes)
+
+    fd = (q_p_1 - q)
+    bd = (q - q_m_1)
+
+    mult = (fd * a_minus + bd * a_plus) * V[0] / dx
+    print(mult, "- Mult")
+
+    return mult
+
+
+def upwind_with_spatial(dt, spatial_change, V, q):
+    mult = upwind_spatial(spatial_change, V, q)
+    finite = mult * dt
+
+    print(finite)
+    new = q - finite
+    print(new)
+    return new
 
 
 def advect_1d_upwind(dt, spatial_change, V, q):
@@ -173,4 +200,37 @@ def advection_forward_differences(dt, spatial_change, V, q):
     if dimensions == 1:
         advect_1d_fd(dt, spatial_change, V, q)
     # for dimension, delta in enumerate(spatial_change):
+
+
+def central_spatial(spatial_change, V, q):
+    # break out for method of lines: do spatial derivative, then solve for time.
+    dx = spatial_change[0]
+
+    q_p_1 = unit_roll(q, -1, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+
+    cd = (q_p_1 - q_m_1)
+
+    mult = cd * V[0] / dx
+    print(mult, "- Mult")
+
+    return mult
+
+
+def forward_time(dt, spatial_change, V, q, spatial_func):
+    mult = spatial_func(spatial_change, V, q)
+    finite = mult * dt
+
+    print(finite)
+    new = q - finite
+    print(new)
+    return new
+
+
+def ftcs_with_central(dt, spatial_change, V, q):
+    return forward_time(dt, spatial_change, V, q, central_spatial)
+
+
+def ft_with_upwind(dt, spatial_change, V, q):
+    return forward_time(dt, spatial_change, V, q, upwind_spatial)
 
