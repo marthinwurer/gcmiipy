@@ -234,3 +234,31 @@ def ftcs_with_central(dt, spatial_change, V, q):
 def ft_with_upwind(dt, spatial_change, V, q):
     return forward_time(dt, spatial_change, V, q, upwind_spatial)
 
+
+def lax_friedrichs(dt, spatial_change, V, q):
+
+    # central spatial difference with averaged center
+    dx = spatial_change[0]
+
+    q_p_1 = unit_roll(q, -1, 0)
+    q_m_1 = unit_roll(q, 1, 0)
+
+    cd = (q_p_1 - q_m_1)
+
+    mult = cd * V[0] / dx
+    print(mult, "- Mult")
+
+    q_avg = (q_p_1 + q_m_1) / 2
+    finite = mult * dt
+
+    print(finite)
+    new = q_avg - finite
+    print(new)
+    return new
+
+
+def get_total_variation(q):
+    q_p_1 = unit_roll(q, -1, 0)
+    diff = q - q_p_1
+    return np.sum(np.abs(diff))
+

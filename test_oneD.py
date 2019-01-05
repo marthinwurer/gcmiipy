@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 import unittest
 
 from just_units import advect_1d_fd, advect_1d_lf, advect_1d_upwind, advect_1d_upwind_second, advect_1d_upwind_third, \
-    upwind_with_spatial, ftcs_with_central, ft_with_upwind
+    upwind_with_spatial, ftcs_with_central, ft_with_upwind, lax_friedrichs, get_total_variation
 from constants import units
 
+logger = logging.getLogger(__name__)
 
 def setUpModule():
     FORMAT = '%(asctime)-15s | %(filename)s:%(lineno)s | %(message)s'
@@ -56,6 +57,9 @@ class TestOneD(unittest.TestCase):
         plt.show()
         q_prev = q
 
+        initial_variation = get_total_variation(q)
+        logger.info("Initial Variation: %s" % (initial_variation,))
+
         for i in range(num_steps):
             print("iteration %s" % i)
             plt.clf()
@@ -67,31 +71,14 @@ class TestOneD(unittest.TestCase):
             q_next = func(dt, spatial_change, V, q_prev)
             q_prev = q_next
 
+        final_variation = get_total_variation(q_next)
+        logger.info("Initial Variation: %s Final Variation: %s" % (initial_variation, final_variation))
+
         plt.ioff()
         plt.show()
 
     def test_forward(self):
-        V, q = self.get_initial_conditions()
-        plt.ion()
-        plt.figure()
-        plt.plot(q)
-        plt.title('Initial state')
-        plt.show()
-        q_prev = q
-
-        for i in range(num_steps):
-            print("iteration %s" % i)
-            plt.clf()
-            plt.plot(q_prev)
-            plt.title('current_state...')
-            plt.show()
-            plt.pause(0.001)  # pause a bit so that plots are updated
-
-            q_next = advect_1d_fd(dt, spatial_change, V, q_prev)
-            q_prev = q_next
-
-        plt.ioff()
-        plt.show()
+        self.basic_run(advect_1d_fd)
 
     def test_upwind(self):
         self.basic_run(advect_1d_upwind)
@@ -110,6 +97,9 @@ class TestOneD(unittest.TestCase):
 
     def test_ftcs_upwind(self):
         self.basic_run(ft_with_upwind)
+
+    def test_lax_friedrichs(self):
+        self.basic_run(lax_friedrichs)
 
     def test_leapfrog(self):
         V, q = self.get_initial_conditions()
