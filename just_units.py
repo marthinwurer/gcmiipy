@@ -1,24 +1,70 @@
 import numpy as np
 
+from constants import units
 
-# formula
+# world state
+
 
 def unit_roll(a, shift, axis=None):
     return np.roll(a, shift, axis=axis) * a.units
 
 
-def advect_1d_fd(dt, spatial_change, V, q):
-    dx = spatial_change[0]
+class WorldState(object):
+    def __init__(self, spatial_change, V, p, rho, q):
+
+        self.spatial_change = spatial_change
+
+        self.V = V
+        self.p = p
+        self.rho = rho
+        self.q = q
+
+    def q_x(self, x):
+        # have to use -x because we're rolling the selected index to the
+        # current one, in the other direction
+        return unit_roll(self.q, -x, 0)
+
+    def dx(self):
+        return self.spatial_change[-1]
+
+    def v_x(self):
+        return self.V[-1]
+
+    def next_q(self, q_next):
+        return WorldState(self.spatial_change, self.V, self.p, self.rho, q_next)
+
+
+def get_initial_world(world_shape, spatial_change):
+    V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+    p = np.zeros((*world_shape,)) * units.Pa
+    rho = np.zeros((*world_shape,)) * units.kg * units.m ** -3
+    q = np.zeros((*world_shape,)) * units.kg / units.kg
+
+    # getting the dimensions
+    half = world_shape[0] // 2
+    quarter = half // 2
+
+    # initial conditions
+    q[quarter:half] = 1.0
+    V[0][:] = 1.0 * units.m / units.s
+    world = WorldState(spatial_change, V, p, rho, q)
+    return world
+
+# formulas
+
+
+def advect_1d_fd(dt, world: WorldState):
+    dx = world.dx()
     # have to use -1 because we're rolling the next index back to the current one
-    q_p_1 = unit_roll(q, -1, 0)
+    q_p_1 = world.q_x(1)
 
-    print(q)
+    print(world.q)
 
-    difference = (q_p_1 - q)
+    difference = (q_p_1 - world.q)
     print(difference)
 
-    print(V[0])
-    mult = difference * V[0]
+    print(world.V[0])
+    mult = difference * world.V[0]
     print(mult, "- Mult")
 
     step = dt / dx
@@ -26,9 +72,9 @@ def advect_1d_fd(dt, spatial_change, V, q):
     finite = mult * step
 
     print(finite)
-    new = q - finite
+    new = world.q - finite
     print(new)
-    return new
+    return world.next_q(new)
 
 
 def advect_1d_lf(dt, spatial_change, V, q, q_prev):
@@ -193,13 +239,6 @@ def advection_1d_rk4(dt, spatial_change, V, q):
     new = q - finite
     print(new)
     return new
-
-
-def advection_forward_differences(dt, spatial_change, V, q):
-    dimensions = len(spatial_change)
-    if dimensions == 1:
-        advect_1d_fd(dt, spatial_change, V, q)
-    # for dimension, delta in enumerate(spatial_change):
 
 
 def central_spatial(spatial_change, V, q):

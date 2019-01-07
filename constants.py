@@ -1,5 +1,4 @@
 
-import numpy as np
 import pint
 
 units = pint.UnitRegistry()
@@ -19,4 +18,8 @@ Rd = 287 * units.J * units.K ** -1 * units.kg ** -2
 rd = 1.275 * units.kg * units.m ** -3
 
 
-print(R)
+
+# Dimensions for indexing state
+x_dim = -1
+y_dim = -2
+z_dim = -3

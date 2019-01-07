@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import unittest
 
 from just_units import advect_1d_fd, advect_1d_lf, advect_1d_upwind, advect_1d_upwind_second, advect_1d_upwind_third, \
-    upwind_with_spatial, ftcs_with_central, ft_with_upwind, lax_friedrichs, get_total_variation
+    upwind_with_spatial, ftcs_with_central, ft_with_upwind, lax_friedrichs, get_total_variation, WorldState, \
+    get_initial_world
 from constants import units
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,8 @@ class TestOneD(unittest.TestCase):
 
             q_next = func(dt, spatial_change, V, q_prev)
             q_prev = q_next
+        else:
+            q_next = q
 
         final_variation = get_total_variation(q_next)
         logger.info("Initial Variation: %s Final Variation: %s" % (initial_variation, final_variation))
@@ -77,8 +80,34 @@ class TestOneD(unittest.TestCase):
         plt.ioff()
         plt.show()
 
+    def world_run(self, func, world):
+        plt.ion()
+        plt.figure()
+        plt.plot(world.q)
+        plt.title('Initial state')
+        plt.show()
+
+        initial_variation = get_total_variation(world.q)
+        logger.info("Initial Variation: %s" % (initial_variation,))
+
+        for i in range(num_steps):
+            print("iteration %s" % i)
+            plt.clf()
+            plt.plot(world.q)
+            plt.title('current_state...')
+            plt.show()
+            plt.pause(0.001)  # pause a bit so that plots are updated
+
+            world = func(dt, world)
+
+        final_variation = get_total_variation(world.q)
+        logger.info("Initial Variation: %s Final Variation: %s" % (initial_variation, final_variation))
+
+        plt.ioff()
+        plt.show()
+
     def test_forward(self):
-        self.basic_run(advect_1d_fd)
+        self.world_run(advect_1d_fd, get_initial_world(world_shape, spatial_change))
 
     def test_upwind(self):
         self.basic_run(advect_1d_upwind)
