@@ -1,12 +1,8 @@
 import numpy as np
 
-from constants import units
+from constants import units, unit_roll
 
 # world state
-
-
-def unit_roll(a, shift, axis=None):
-    return np.roll(a, shift, axis=axis) * a.units
 
 
 class WorldState(object):
@@ -135,9 +131,9 @@ def advect_1d_upwind(dt, spatial_change, V, q):
     q_p_1 = unit_roll(q, -1, 0)
     q_m_1 = unit_roll(q, 1, 0)
 
-    zeroes = np.zeros(q.shape)
+    zeroes = np.zeros(q.shape) * units.meter / units.second
 
-    a_plus = np.maximum(V[0], zeroes)
+    a_plus = np.maximum(V[0], zeroes)  # need to cast zeros to unit tyoe
     a_minus = np.minimum(V[0], zeroes)
 
     fd = (q_p_1 - q)
@@ -222,6 +218,7 @@ def advection_1d_rk4(dt, spatial_change, V, q):
 
     zeroes = np.zeros(q.shape)
 
+    # TODO This gets the wrong units
     a_plus = np.maximum(V[0], zeroes)
     a_minus = np.minimum(V[0], zeroes)
 

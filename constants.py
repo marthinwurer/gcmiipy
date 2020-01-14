@@ -23,3 +23,18 @@ rd = 1.275 * units.kg * units.m ** -3
 x_dim = -1
 y_dim = -2
 z_dim = -3
+
+
+"""
+Functions for using units with numpy helper functions
+"""
+def unit_roll(a, shift, axis=None):
+    return np.roll(a, shift, axis=axis) * a.units
+
+
+def unit_maximum(a, b):
+    return np.maximum(a, b) * a.units
+
+
+def unit_minimum(a, b):
+    return np.minimum(a, b) * a.units

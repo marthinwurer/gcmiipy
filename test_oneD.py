@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def setUpModule():
     FORMAT = '%(asctime)-15s | %(filename)s:%(lineno)s | %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+    logging.basicConfig(format=FORMAT, level=logging.INFO)
 
 
 dx = 10 * units.m
@@ -45,7 +45,7 @@ class TestOneD(unittest.TestCase):
 
         # initial conditions
         q[quarter:half] = 1.0
-        V[0][:] = 1.0 * units.m / units.s
+        V[0][:] = -1.0 * units.m / units.s
 
         return V, q
 
