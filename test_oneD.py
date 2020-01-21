@@ -7,6 +7,7 @@ from just_units import advect_1d_fd, advect_1d_lf, advect_1d_upwind, advect_1d_u
     upwind_with_spatial, ftcs_with_central, ft_with_upwind, lax_friedrichs, get_total_variation, WorldState, \
     get_initial_world
 from constants import units
+from two_d import upwind_axis, fv_advect_axis_plain, fv_advect_axis_upwind
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,9 @@ class TestOneD(unittest.TestCase):
         # initial conditions
         q[quarter:half] = 1.0
         V[0][:] = -1.0 * units.m / units.s
+        # q[:] = 1.0
+        # q[half] = .5
+        # V[0][quarter:half] = 1.0 * units.m / units.s
 
         return V, q
 
@@ -129,6 +133,15 @@ class TestOneD(unittest.TestCase):
 
     def test_lax_friedrichs(self):
         self.basic_run(lax_friedrichs)
+
+    def test_upwind_axis(self):
+        self.basic_run(upwind_axis)
+
+    def test_fv_upwind(self):
+        self.basic_run(fv_advect_axis_upwind)
+
+    def test_fv_plain(self):
+        self.basic_run(fv_advect_axis_plain)
 
     def test_leapfrog(self):
         V, q = self.get_initial_conditions()

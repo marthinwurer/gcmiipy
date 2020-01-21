@@ -296,5 +296,5 @@ def lax_friedrichs(dt, spatial_change, V, q):
 def get_total_variation(q):
     q_p_1 = unit_roll(q, -1, 0)
     diff = q - q_p_1
-    return np.sum(np.abs(diff))
+    return np.sum(np.abs(diff.m)) * q.u
 
