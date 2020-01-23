@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
-from constants import units, unit_roll
+from constants import units, unit_roll, get_total_variation, unit_maximum, unit_minimum, G
+
 
 # world state
 
@@ -101,10 +103,10 @@ def upwind_spatial(spatial_change, V, q):
     q_p_1 = unit_roll(q, -1, 0)
     q_m_1 = unit_roll(q, 1, 0)
 
-    zeroes = np.zeros(q.shape)
+    zeroes = np.zeros(q.shape) * V.units  # need to cast zeros to unit type
 
-    a_plus = np.maximum(V[0], zeroes)
-    a_minus = np.minimum(V[0], zeroes)
+    a_plus = unit_maximum(V[0], zeroes)
+    a_minus = unit_minimum(V[0], zeroes)
 
     fd = (q_p_1 - q)
     bd = (q - q_m_1)
@@ -293,8 +295,93 @@ def lax_friedrichs(dt, spatial_change, V, q):
     return new
 
 
-def get_total_variation(q):
-    q_p_1 = unit_roll(q, -1, 0)
-    diff = q - q_p_1
-    return np.sum(np.abs(diff.m)) * q.u
+def run_1d_with_ft(initial_conditions, ft, steps=400, display_key="q", variation_key="q"):
+    """
+    Run and display a 2d system
+    Args:
+        initial_conditions: the initial conditions of the system. A dict.
+        ft: the function that computes the values at the next time step
+        display_key: The key of the dict to graph
+        variation_key: the key of the dict to compute variation
+    """
+    current_conditions = initial_conditions
+    plt.ion()
+    plt.figure()
+    plt.plot(current_conditions[display_key])
+    plt.title('Initial state')
+    plt.show()
+
+    initial_variation = get_total_variation(current_conditions[variation_key])
+    print("Initial Variation: %s" % (initial_variation,))
+
+    for i in range(steps):
+        # print("iteration %s" % i)
+        plt.clf()
+        plt.plot(current_conditions[display_key])
+        plt.title('current_state...')
+        plt.show()
+        plt.pause(0.001)  # pause a bit so that plots are updated
+
+        current_conditions = ft(**current_conditions)
+        current_variation = get_total_variation(current_conditions[variation_key])
+        # if initial_variation.m + 0.00001 < current_variation.m or \
+        if initial_variation.m + 1000 < current_variation.m or \
+                np.isnan(current_conditions[variation_key]).any():
+            print("iteration %s" % i)
+            print("Variation too high: %s" % (current_variation,))
+            return False
+
+    final_variation = get_total_variation(current_conditions[variation_key])
+    print("Initial Variation: %s Final Variation: %s" % (initial_variation, final_variation))
+
+    plt.ioff()
+    plt.show()
+
+    return True
+
+
+def shallow_water_g_center_space(dt, spatial_change, h):
+    dx = spatial_change[0]
+
+    h_p_1 = unit_roll(h, -1, 0)
+    h_m_1 = unit_roll(h, 1, 0)
+
+    cd = (h_p_1 - h_m_1) / (2 * dx) * G * dt
+    return cd
+
+
+def shallow_water_h_center_space(dt, spatial_change, u, H):
+    dx = spatial_change[-1]
+    u = u[-1]
+
+    u_p_1 = unit_roll(u, -1, -1)
+    u_m_1 = unit_roll(u, 1, -1)
+
+    cd = (u_p_1 - u_m_1) / (2 * dx) * H * dt
+    return cd
+
+
+def shallow_water_g_c_grid(dt, spatial_change, h):
+    dx = spatial_change[0]
+
+    h_p_1 = unit_roll(h, -1, 0)
+
+    cd = (h_p_1 - h) / dx * G * dt
+    return cd
+
+
+def shallow_water_h_c_grid(dt, spatial_change, u, H):
+    dx = spatial_change[-1]
+
+    # each u space is u[j+1/2]
+    u_p_1 = u[-1]
+
+    # now u[j-1/2]
+    u_m_1 = unit_roll(u[-1], 1, -1)
+
+    cd = (u_p_1 - u_m_1) / dx * H * dt
+    return cd
+
+
+
 

@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from constants import units, standard_pressure
-from just_units import get_total_variation
 from two_d import *
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,8 @@ dx = 10 * units.m
 dy = 10 * units.m
 dt = 1 * units.s
 # side_length = 160
-side_length = 16
+# side_length = 16
+side_length = 4
 world_shape = (side_length, side_length)
 half = world_shape[0] // 2
 quarter = half // 2
@@ -194,7 +194,7 @@ class Test2d(unittest.TestCase):
     def test_pgf_one_d(self):
         U = np.zeros((1, 3)) * units.m / units.s
         p = np.full((3,), 1, dtype=np.float) * units.Pa
-        p[1] = 0 * units.Pa
+        p[1, 1] = 0.1 * units.Pa
         p_edge = pressure_at_edge_one_d(p)
 
         V = U * p_edge
@@ -209,7 +209,7 @@ class Test2d(unittest.TestCase):
     def test_pgf_units(self):
         U = np.zeros((2, 3, 3)) * units.m / units.s
         p = np.full((3, 3), 1, dtype=np.float) * units.Pa
-        p[1, 1] = 0 * units.Pa
+        p[1, 1] = 0.1 * units.Pa
         p_edge = pressure_at_edge(p)
 
         V = U * p_edge
@@ -220,6 +220,82 @@ class Test2d(unittest.TestCase):
 
         # We just want this to work without exceptions due to units
         self.assertIsNotNone(v_next)
+
+    def test_pgf_temp_units(self):
+        U = np.zeros((2, 3, 3)) * units.m / units.s
+        p = np.full((3, 3), 1, dtype=np.float) * units.Pa
+        t = np.full((3, 3), standard_temperature.m) * units.K
+        p[1, 1] = 0.1 * units.Pa
+        p_edge = pressure_at_edge(p)
+
+        V = U * p_edge
+
+        pgf = pgf_c_grid(dt, spatial_change, p, t)
+
+        v_next = V - pgf * p_edge
+
+        # We just want this to work without exceptions due to units
+        self.assertIsNotNone(v_next)
+
+    def test_run_func(self):
+        V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        q = np.zeros((*world_shape,), dtype=np.float) * units.grams
+        q[quarter:half, quarter:half] = 1.0 * units.grams
+        V[0][:] = 2.0 * units.m / units.s
+        V[1][:] = -2.0 * units.m / units.s
+
+        state = {"V": V, "q": q}
+
+        def ft(V, q):
+            q_next = corner_transport_2d(dt, spatial_change, V, q)
+            state = {"V": V, "q": q_next}
+            return state
+
+        stable = run_2d_with_ft(state, ft)
+        self.assertTrue(stable)
+
+    def test_iterative_pgf(self):
+        V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        p = np.full((*world_shape,), standard_pressure.m, dtype=np.float) * units.Pa
+        t = np.full((*world_shape,), 273.15) * units.kelvin
+        p[half, half] += 0.0001 * units.Pa
+
+        state = {"V": V, "p": p, "t": t}
+
+        def ft(V, p, t):
+            p_next = finite_volume_advection(dt, spatial_change, V, p)
+            pgf = pgf_c_grid(dt, spatial_change, p, t)
+            v_next = V - pgf
+            state = {"V": v_next, "p": p_next, "t": t}
+            return state
+
+        stable = run_2d_with_ft(state, ft, display_key="p", variation_key="p")
+        self.assertTrue(stable)
+
+    def test_backward_pgf(self):
+        # uses a backward euler or Matsuno scheme
+        V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        p = np.full((*world_shape,), standard_pressure.m, dtype=np.float) * units.Pa
+        t = np.full((*world_shape,), 273.15) * units.kelvin
+        p[half, half] += 0.0001 * units.Pa
+
+        state = {"V": V, "p": p, "t": t}
+
+        def ft(V, p, t):
+            p_star = finite_volume_advection(dt, spatial_change, V, p)
+            pgf_star = pgf_c_grid(dt, spatial_change, p, t)
+            v_star = V - pgf_star
+            p_next = finite_volume_advection(dt, spatial_change, v_star, p_star)
+            pgf_next = pgf_c_grid(dt, spatial_change, p_star, t)
+            v_next = V - pgf_next
+            state = {"V": v_next, "p": p_next, "t": t}
+            return state
+
+        stable = run_2d_with_ft(state, ft, display_key="p", variation_key="p")
+        self.assertTrue(stable)
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

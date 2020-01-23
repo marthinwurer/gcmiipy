@@ -4,7 +4,8 @@ from operator import mul
 import numpy as np
 import matplotlib.pyplot as plt
 
-from constants import units, unit_roll, unit_maximum, unit_minimum, unit_stack, R, Rd, kappa, P0, standard_temperature
+from constants import units, unit_roll, unit_maximum, unit_minimum, unit_stack, R, Rd, kappa, P0, standard_temperature, \
+    get_total_variation
 
 
 def upwind_axis(dt, spatial_change, V, q, axis=0):
@@ -29,6 +30,30 @@ def upwind_axis(dt, spatial_change, V, q, axis=0):
     finite = mult * step
     new = q - finite
     return new
+
+
+def upwind_axis_finite(dt, spatial_change, V, q, axis=0):
+    """
+    upwind along a single axis
+    https://en.wikipedia.org/wiki/Upwind_scheme
+    """
+    dx = spatial_change[axis]
+    zeroes = np.zeros(q.shape) * V.units  # need to cast zeros to unit type
+
+    q_p_1 = unit_roll(q, -1, axis)
+    q_m_1 = unit_roll(q, 1, axis)
+
+    a_plus = unit_maximum(V[axis], zeroes)
+    a_minus = unit_minimum(V[axis], zeroes)
+
+    u_minus = (q - q_m_1)
+    u_plus = (q_p_1 - q)
+
+    mult = a_plus * u_minus + a_minus * u_plus
+    step = (dt / dx)
+    finite = mult * step
+    return finite
+
 
 
 def corner_transport_2d(dt, spatial_change, V, q):
@@ -91,6 +116,22 @@ def fv_advect_axis_upwind(dt, spatial_change, V, p, axis=0):
     return p_next
 
 
+def fv_advect_axis_upwind_finite(dt, spatial_change, V, p, axis=0):
+    dx = spatial_change[axis]
+    p_p_1 = unit_roll(p, -1, axis)
+
+    zeroes = np.zeros(p.shape) * V.units  # need to cast zeros to unit type
+    a_plus = unit_maximum(V[axis], zeroes)
+    a_minus = unit_minimum(V[axis], zeroes)
+
+    flux = (p * a_plus + p_p_1 * a_minus) * dt / dx
+
+    f_m_1 = unit_roll(flux, 1, axis)
+
+    finite = f_m_1 - flux
+    return finite
+
+
 def fv_advect_axis_plain(dt, spatial_change, V, p, axis=0):
     dx = spatial_change[axis]
     volume = reduce(mul, [*spatial_change], 1)
@@ -108,6 +149,21 @@ def fv_advect_axis_plain(dt, spatial_change, V, p, axis=0):
     return p_next
 
 
+def fv_advect_axis_plain_finite(dt, spatial_change, V, p, axis=0):
+    dx = spatial_change[axis]
+    volume = reduce(mul, [*spatial_change], 1)
+    area = volume / dx
+    p_p_1 = unit_roll(p, -1, axis)
+
+    average_at_edge = (p + p_p_1) / 2
+
+    # flux is the velocity times the quantity
+    flux = V[axis] * average_at_edge * dt * area
+
+    f_m_1 = unit_roll(flux, 1, axis)
+
+    finite = f_m_1 - flux
+    return finite
 
 
 
@@ -176,6 +232,8 @@ def pgf_c_grid(dt, spatial_change, p, t):
     # SPA(I,J,LM)=SIG(LM)*SP*RGAS*T(I,J,LM)*PKDN/PDN
     # spa[y][x] = (p[y][x] + ptop)**kappa * t[y][x] * R_dry
     sig = 1
+
+    # convert from potential temperature to real temperature
     true_t = t / (P0 / p) ** kappa
     # spa = p **
     rho = (p / (Rd * true_t)).to_base_units()
@@ -245,6 +303,47 @@ def pgf_one_d(dt, dx, p, axis=0):
     return pgf
 
 
+def run_2d_with_ft(initial_conditions, ft, steps=400, display_key="q", variation_key="q"):
+    """
+    Run and display a 2d system
+    Args:
+        initial_conditions: the initial conditions of the system. A dict.
+        ft: the function that computes the values at the next time step
+        display_key: The key of the dict to graph
+        variation_key: the key of the dict to compute variation
+    """
+    current_conditions = initial_conditions
+    plt.ion()
+    plt.figure()
+    plt.imshow(current_conditions[display_key])
+    plt.title('Initial state')
+    plt.show()
+
+    initial_variation = get_total_variation(current_conditions[variation_key])
+    print("Initial Variation: %s" % (initial_variation,))
+
+    for i in range(steps):
+        # print("iteration %s" % i)
+        plt.clf()
+        plt.imshow(current_conditions[display_key])
+        plt.title('current_state...')
+        plt.show()
+        plt.pause(0.001)  # pause a bit so that plots are updated
+
+        current_conditions = ft(**current_conditions)
+        current_variation = get_total_variation(current_conditions[variation_key])
+        if current_variation.m > initial_variation.m + 0.00001:
+            print("iteration %s" % i)
+            print("Variation too high: %s" % (current_variation,))
+            # return False
+
+    final_variation = get_total_variation(current_conditions[variation_key])
+    print("Initial Variation: %s Final Variation: %s" % (initial_variation, final_variation))
+
+    plt.ioff()
+    plt.show()
+
+    return True
 
 
 

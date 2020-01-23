@@ -3,11 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import unittest
 
-from just_units import advect_1d_fd, advect_1d_lf, advect_1d_upwind, advect_1d_upwind_second, advect_1d_upwind_third, \
-    upwind_with_spatial, ftcs_with_central, ft_with_upwind, lax_friedrichs, get_total_variation, WorldState, \
-    get_initial_world
-from constants import units
-from two_d import upwind_axis, fv_advect_axis_plain, fv_advect_axis_upwind
+from just_units import *
+from constants import units, get_total_variation, standard_pressure
+from two_d import upwind_axis, fv_advect_axis_plain, fv_advect_axis_upwind, upwind_axis_finite, pgf_one_d, \
+    fv_advect_axis_upwind_finite
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ dy = 10 * units.m
 
 dt = 1 * units.s
 
-world_shape = (160,)
+world_shape = (161,)
 
 half = world_shape[0] // 2
 
@@ -165,4 +164,129 @@ class TestOneD(unittest.TestCase):
 
         plt.ioff()
         plt.show()
+
+    def test_upwind_axis_run(self):
+        # uses a backward euler or Matsuno scheme
+        V, q = self.get_initial_conditions()
+        # V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        # q = np.full((*world_shape,), standard_pressure.m, dtype=np.float) * units.Pa
+        # t = np.full((*world_shape,), 273.15) * units.kelvin
+        # p[half, half] += 0.0001 * units.Pa
+
+        state = {"V": V, "q": q}
+
+        def ft(V, q):
+            q_next = upwind_axis(dt, spatial_change, V, q)
+            state = {"V": V, "q": q_next}
+            return state
+
+        stable = run_1d_with_ft(state, ft)
+        self.assertTrue(stable)
+
+    def test_upwind_axis_backwards_euler(self):
+        # uses a backward euler or Matsuno scheme
+        V, q = self.get_initial_conditions()
+        # V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        # q = np.full((*world_shape,), standard_pressure.m, dtype=np.float) * units.Pa
+        # t = np.full((*world_shape,), 273.15) * units.kelvin
+        # p[half, half] += 0.0001 * units.Pa
+
+        state = {"V": V, "q": q}
+
+        def ft(V, q):
+            q_star = q - upwind_axis_finite(dt, spatial_change, V, q)
+            q_next = q - upwind_axis_finite(dt, spatial_change, V, q_star)
+            state = {"V": V, "q": q_next}
+            return state
+
+        stable = run_1d_with_ft(state, ft)
+        self.assertTrue(stable)
+
+    def test_pgf_matsuno(self):
+        # uses a backward euler or Matsuno scheme
+        V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        q = np.full((*world_shape,), standard_pressure.m, dtype=np.float) * units.Pa
+        q[half] += 0.001 * units.Pa
+
+        state = {"V": V, "q": q}
+
+        def ft(V, q):
+            q_star = q - fv_advect_axis_upwind_finite(dt, spatial_change, V, q)
+            v_star = V + pgf_one_d(dt, spatial_change[0], q)
+            q_next = q - fv_advect_axis_upwind_finite(dt, spatial_change, v_star, q_star)
+            v_next = V + pgf_one_d(dt, spatial_change[0], q_star)
+            # q_next = q_star
+            # v_next = v_star
+            state = {"V": v_next, "q": q_next}
+            return state
+
+        stable = run_1d_with_ft(state, ft)
+        self.assertTrue(stable)
+
+    def test_forward_backward(self):
+        # uses the scheme from https://www.youtube.com/watch?v=1wWHqltukXo
+        V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        H = 1 * units.m
+        q = np.zeros((*world_shape,), dtype=np.float) * units.m
+        q[:] = H
+        q[half: half+3] += 0.1 * units.m
+
+        state = {"V": V, "q": q}
+
+        def ft(V, q):
+            v_next = V - shallow_water_g_center_space(dt, spatial_change, q)
+            q_next = q - shallow_water_h_center_space(dt, spatial_change, v_next, H)
+            state = {"V": v_next, "q": q_next}
+            return state
+
+        stable = run_1d_with_ft(state, ft)
+        self.assertTrue(stable)
+
+    def test_forward_backward_advection(self):
+        # uses the scheme from https://www.youtube.com/watch?v=1wWHqltukXo
+        # the only issue with this scheme is that sqrt(g*H)dt/dx needs to be < 2,
+        # which may be unfeasable for the grid size that I want to use.
+        # minimum grid size = sqrt(g*h)dt = sqrt(10*1000)*900s = 90000m
+        V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        H = 1000 * units.m
+        q = np.zeros((*world_shape,), dtype=np.float) * units.m
+        q[:] = H
+        q[half: half+3] += 0.1 * units.m
+
+        state = {"V": V, "q": q}
+        spatial_change = (100000 * units.m,)
+        dt = 900 * units.s
+
+        def ft(V, q):
+            v_next = V - shallow_water_g_center_space(dt, spatial_change, q)
+            q_next = q - shallow_water_h_center_space(dt, spatial_change, v_next, q)
+            state = {"V": v_next, "q": q_next}
+            return state
+
+        stable = run_1d_with_ft(state, ft)
+        self.assertTrue(stable)
+
+    def test_forward_backward_c_grid(self):
+        # uses the scheme from https://www.youtube.com/watch?v=1wWHqltukXo
+        # the only issue with this scheme is that sqrt(g*H)dt/dx needs to be < 2,
+        # which may be unfeasable for the grid size that I want to use.
+        # minimum grid size = sqrt(g*h)dt = sqrt(10*1000)*900s = 90000m
+        V = np.zeros((len(world_shape), *world_shape)) * units.m / units.s
+        H = 1000 * units.m
+        q = np.zeros((*world_shape,), dtype=np.float) * units.m
+        q[:] = H
+        q[half: half+3] += 1 * units.m
+
+        state = {"V": V, "q": q}
+        spatial_change = (100000 * units.m,)
+        dt = 900 * units.s
+
+        def ft(V, q):
+            v_next = V - shallow_water_g_c_grid(dt, spatial_change, q)
+            q_next = q - shallow_water_h_c_grid(dt, spatial_change, v_next, q)
+            state = {"V": v_next, "q": q_next}
+            return state
+
+        stable = run_1d_with_ft(state, ft, steps=10000)
+        self.assertTrue(stable)
 

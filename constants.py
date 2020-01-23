@@ -31,6 +31,8 @@ P0 = 100000 * units.Pa  # 1000 hPa
 standard_pressure = 101325 * units.Pa
 standard_temperature = 273.16 * units.K
 
+# gravity on earth
+G = 9.8 * units.m / units.s ** 2
 
 
 # Dimensions for indexing state
@@ -56,3 +58,9 @@ def unit_minimum(a, b):
 
 def unit_stack(a):
     return np.stack([item.m for item in a]) * a[0].units
+
+
+def get_total_variation(q):
+    q_p_1 = unit_roll(q, -1, 0)
+    diff = q - q_p_1
+    return np.sum(np.abs(diff.m)) * q.u
