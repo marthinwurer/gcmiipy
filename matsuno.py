@@ -35,10 +35,35 @@ def advection_of_velocity_u(u, v, dx):
     return finite
 
 
+def advection_of_velocity_v(u, v, dx):
+    # ipj is i+1/2,j ; imj is i-1/2,j
+    u_ipj = (unit_roll(u, -1, 0) + u) / 2
+    u_imj = (unit_roll(u, 1, 0) + u) / 2
+    dv_ipj = unit_roll(v, -1, 0) - v
+    dv_imj = v - unit_roll(v, 1, 0)
+    v_ijp = (unit_roll(v, -1, 1) + v) / 2
+    v_ijm = (unit_roll(u, 1, 1) + v) / 2
+    dv_ijp = unit_roll(u, -1, 1) - v
+    dv_ijm = v - unit_roll(v, 1, 1)
+
+    finite = (u_ipj * dv_ipj + u_imj * dv_imj +
+              v_ijp * dv_ijp + v_ijm * dv_ijm) / (2 * dx)
+    return finite
+
+
 def geopotential_gradient_u(p, dx):
     # ipj = i+1,j; m is minus 1
     p_ipj = unit_roll(p, -1, 0)
     p_imj = unit_roll(p, 1, 0)
+
+    finite = (p_ipj - p_imj) / (2 * dx) * G
+    return finite
+
+
+def geopotential_gradient_v(p, dx):
+    # ipj = i+1,j; m is minus 1
+    p_ipj = unit_roll(p, -1, 1)
+    p_imj = unit_roll(p, 1, 1)
 
     finite = (p_ipj - p_imj) / (2 * dx) * G
     return finite
@@ -59,16 +84,16 @@ def advection_of_geopotential(u, v, p, dx):
 def matsumo_scheme(u, v, p, dx, dt):
     u_star = u - dt * (advection_of_velocity_u(u, v, dx) +
                         geopotential_gradient_u(p, dx))
-    v_star = v
-    # v_star = v - dt * (advection_of_velocity_v(u, v, dx) +
-    #                    geopotential_gradient_v(p, dx))
+    # v_star = v
+    v_star = v - dt * (advection_of_velocity_v(u, v, dx) +
+                       geopotential_gradient_v(p, dx))
     p_star = p - dt * advection_of_geopotential(u, v, p, dx)
 
     u_next = u - dt * (advection_of_velocity_u(u_star, v_star, dx) +
                        geopotential_gradient_u(p_star, dx))
-    v_next = v
-    # v_next = v - dt * (advection_of_velocity_v(u_star, v_star, dx) +
-    #                    geopotential_gradient_v(p_star, dx))
+    # v_next = v
+    v_next = v - dt * (advection_of_velocity_v(u_star, v_star, dx) +
+                       geopotential_gradient_v(p_star, dx))
     p_next = p - dt * advection_of_geopotential(u_star, v_star, p_star, dx)
 
     return u_next, v_next, p_next
@@ -100,7 +125,7 @@ def main():
         # print("iteration %s" % i)
         plt.clf()
         plt.imshow(p)
-        plt.title('current_state...')
+        plt.title('n = %s' % (i,))
         plt.show()
         plt.pause(0.001)  # pause a bit so that plots are updated
 
