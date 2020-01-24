@@ -6,6 +6,7 @@ https://www.jstage.jst.go.jp/article/jmsj1965/44/1/44_1_76/_pdf
 """
 import numpy as np
 import matplotlib.pyplot as plt
+import tqdm as tqdm
 
 """
 U is x dimension velocity
@@ -14,6 +15,10 @@ arrays are [y,x]
            [i, j]
 
 need separate functions for u and for v
+
+These are all A grids. These have unsuitable checkerboard patterns.
+I want a C grid. 
+This means that I need to discretize and implement new dimensions.
 """
 
 from constants import units, unit_roll, G, get_total_variation
@@ -72,10 +77,10 @@ def geopotential_gradient_v(p, dx):
 def advection_of_geopotential(u, v, p, dx):
     up = u * p
     vp = v * p
-    up_ipj = unit_roll(up, -1, 0)
-    up_imj = unit_roll(up, 1, 0)
-    vp_ijp = unit_roll(vp, -1, 1)
-    vp_ijm = unit_roll(vp, 1, 1)
+    up_ipj = (unit_roll(up, -1, 0) + up) / 2
+    up_imj = (unit_roll(up, 1, 0) + up) / 2
+    vp_ijp = (unit_roll(vp, -1, 1) + vp) / 2
+    vp_ijm = (unit_roll(vp, 1, 1) + vp) / 2
 
     finite = (up_ipj - up_imj) / dx + (vp_ijp - vp_ijm) / dx
     return finite
@@ -141,7 +146,6 @@ def main():
 
     plt.ioff()
     plt.show()
-
 
 
 if __name__ == '__main__':
