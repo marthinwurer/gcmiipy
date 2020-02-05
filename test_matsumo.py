@@ -1,4 +1,7 @@
 import unittest
+
+from constants import standard_pressure, standard_temperature
+from matsumo_temp import density_from, geopotential_from
 from matsuno_c_grid import *
 
 
@@ -25,3 +28,27 @@ class TestCGrid(unittest.TestCase):
         grad = geopotential_gradient_v(p, 1 * units.m)
         self.assertEqual(G.m, grad[1, 1].m)
 
+
+class TestTemperature(unittest.TestCase):
+    def test_density_units(self):
+        side_len = 3
+        t = np.full((side_len, side_len), standard_temperature.m) * standard_temperature.u
+        p = np.zeros((side_len, side_len), dtype=np.float) * standard_pressure.u
+        H = standard_pressure
+        p[:] = H
+
+        density = density_from(p, t)
+
+        self.assertEqual((1 * units.kg / units.m ** 3).to_base_units().u, density.to_base_units().u)
+
+    def test_geopotential_units(self):
+        side_len = 3
+        t = np.full((side_len, side_len), standard_temperature.m) * standard_temperature.u
+        p = np.zeros((side_len, side_len), dtype=np.float) * standard_pressure.u
+        H = standard_pressure
+        p[:] = H
+
+        density = density_from(p, t)
+        geo = geopotential_from(density, p)
+
+        self.assertEqual((1 * units.m).to_base_units().u, geo.to_base_units().u)

@@ -181,8 +181,8 @@ def main():
     p = np.zeros((side_len, side_len), dtype=np.float) * units.m
     p[:] = H
     # p[half: half + 2, half:half+2] += 1 * units.m
-    # p[1, 2] += 1 * units.m
-    v[half, half] += 1 * units.m / units.s
+    p[1, 2] += 1 * units.m
+    u[half,half] += 1 * units.m / units.s
 
     plt.ion()
     plt.figure()
@@ -193,10 +193,10 @@ def main():
     initial_variation = get_total_variation(p)
     print("Initial Variation: %s" % (initial_variation,))
 
-    for i in tqdm.tqdm(range(400)):
+    for i in tqdm.tqdm(range(30000)):
         # print("iteration %s" % i)
         plt.clf()
-        plt.imshow(p)
+        plt.imshow(p - H)
         plt.title('n = %s' % (i,))
         plt.show()
         plt.pause(0.001)  # pause a bit so that plots are updated
@@ -207,7 +207,7 @@ def main():
             print("iteration %s" % i)
             print("Variation too high: %s" % (current_variation,))
             # return False
-
+            # break
     final_variation = get_total_variation(p)
     print("Initial Variation: %s Final Variation: %s" % (initial_variation, final_variation))
 
