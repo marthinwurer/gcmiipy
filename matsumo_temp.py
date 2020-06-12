@@ -7,6 +7,7 @@ import tqdm
 from constants import *
 from matsuno_c_grid import advection_of_velocity_u, advection_of_velocity_v, geopotential_gradient_u,\
     geopotential_gradient_v, advection_of_geopotential
+from viscosity import incompressible_viscosity_2d
 
 
 def density_from(p, t):
@@ -23,26 +24,44 @@ def geopotential_from(rho, p):
     return geo.to_base_units()
 
 
+def half_matsumo(u, v, p, t, dx, dt):
+    density = density_from(p, t)
+    geo = geopotential_from(density, p)
+    du = dt * (advection_of_velocity_u(u, v, dx)
+               + geopotential_gradient_u(geo, dx)
+               - incompressible_viscosity_2d(u, mu_air, dx) / density)
+    # v_star = v
+    dv = dt * (advection_of_velocity_v(u, v, dx)
+               + geopotential_gradient_v(geo, dx)
+               - incompressible_viscosity_2d(u, mu_air, dx) / density)
+    dp = dt * advection_of_geopotential(u, v, p, dx)
+    dtemp = dt * advection_of_geopotential(u, v, t, dx)
+
+    return du, dv, dp, dtemp
+
+
 def matsumo_scheme(u, v, p, t, dx, dt):
     density = density_from(p, t)
     geo = geopotential_from(density, p)
-    u_star = u - dt * (advection_of_velocity_u(u, v, dx) +
-                       geopotential_gradient_u(geo, dx))
+    u_star = u - dt * (advection_of_velocity_u(u, v, dx)
+                       + geopotential_gradient_u(geo, dx)
+                       - incompressible_viscosity_2d(u, mu_air, dx) / density)
     # v_star = v
-    v_star = v - dt * (advection_of_velocity_v(u, v, dx) +
-                       geopotential_gradient_v(geo, dx))
+    v_star = v - dt * (advection_of_velocity_v(u, v, dx)
+                       + geopotential_gradient_v(geo, dx)
+                       - incompressible_viscosity_2d(u, mu_air, dx) / density)
     p_star = p - dt * advection_of_geopotential(u, v, p, dx)
     t_star = t - dt * advection_of_geopotential(u, v, t, dx)
 
     density_star = density_from(p_star, t_star)
     geo_star = geopotential_from(density_star, p_star)
-    geo_u_star = geopotential_gradient_u(geo_star, dx)
-    u_next = u - dt * (advection_of_velocity_u(u_star, v_star, dx) +
-                       geo_u_star)
+    u_next = u - dt * (advection_of_velocity_u(u_star, v_star, dx)
+                       + geopotential_gradient_u(geo_star, dx)
+                       - incompressible_viscosity_2d(u_star, mu_air, dx) / density_star)
     # v_next = v
-    geo_v_star = geopotential_gradient_v(geo_star, dx)
-    v_next = v - dt * (advection_of_velocity_v(u_star, v_star, dx) +
-                       geo_v_star)
+    v_next = v - dt * (advection_of_velocity_v(u_star, v_star, dx)
+                       + geopotential_gradient_v(geo_star, dx)
+                       - incompressible_viscosity_2d(u_star, mu_air, dx) / density_star)
     pit_star = advection_of_geopotential(u_star, v_star, p_star, dx)
     p_next = p - dt * pit_star
     t_next = t - dt * advection_of_geopotential(u, v, t_star, dx)
@@ -50,17 +69,21 @@ def matsumo_scheme(u, v, p, t, dx, dt):
     return u_next, v_next, p_next, t_next
 
 
+def gen_initial_conditions(side_len):
+    u = np.zeros((side_len, side_len)) * units.m / units.s
+    v = np.zeros((side_len, side_len)) * units.m / units.s
+    p = np.full((side_len, side_len), standard_pressure.m, dtype=np.float) * standard_pressure.u
+    t = np.full((side_len, side_len), standard_temperature.m) * standard_temperature.u
+    return u, v, p, t
+
+
 def main():
-    side_len = 64
+    side_len = 16
+    u, v, p, t = gen_initial_conditions(side_len)
     dx = 300 * units.km
     dt = 900 * units.s
     half = side_len // 2
-    u = np.zeros((side_len, side_len)) * units.m / units.s
-    v = np.zeros((side_len, side_len)) * units.m / units.s
-    t = np.full((side_len, side_len), standard_temperature.m) * standard_temperature.u
-    p = np.zeros((side_len, side_len), dtype=np.float) * standard_pressure.u
     H = standard_pressure
-    p[:] = H
     # p[half: half + 2, half:half+2] += 1 * units.m
     p[1, 2] += 1 * p.u
     u[half, half] += 1 * units.m / units.s

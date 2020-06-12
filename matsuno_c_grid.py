@@ -9,39 +9,7 @@ import matplotlib.pyplot as plt
 import tqdm as tqdm
 
 from constants import units, unit_roll, G, get_total_variation
-
-"""
-U is x dimension velocity, with the i component
-V is y dimension velocity, with the j component
-arrays are [y, x]
-           [j, i]
-
-need separate functions for u and for v
-
-Coordinates:
-Pij  Uij  Pijp
-Vij       Vijp
-Pipj Uipj Pipjp
-"""
-
-def ipj(q):
-    return unit_roll(q, -1, 1)
-
-
-def imj(q):
-    return unit_roll(q, 1, 1)
-
-
-def ijp(q):
-    return unit_roll(q, -1, 0)
-
-
-def ijm(q):
-    return unit_roll(q, 1, 0)
-
-
-def imjp(q):
-    return imj(ijp(q))
+from coordinates import ijp, ijm, ipj, imj, imjp
 
 
 def advection_of_velocity_u(u, v, dx):
