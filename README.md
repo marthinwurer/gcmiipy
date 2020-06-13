@@ -124,6 +124,86 @@ https://www.myroms.org/wiki/Time-stepping_Schemes_Review
 
 
 
+# Stability
+
+https://www.fluvial.ch/m/Hydraulics2_ShallowWater_2008.pdf
+
+I'm using an explict scheme, so I have to respect the CFL conditions.
+
+That pdf shows that the CFL for shallow water equations is:
+
+```
+CFL = (|u| + c) * dt / dx
+```
+
+Where `u` is flow velocity and `c` is wave velocity (celerity).
+
+Shallow water is where L/h of waves is > 20.
+L = wave length and h = water depth.
+For shallow waves, 
+
+```
+c = sqrt(g * h)
+```
+
+For my initial conditions, h ended up being around 8029m (8km).
+My minimum wavelength from dx was 300km.
+```
+300 / 8 = 37.5
+```
+I was fine being in the shallow regime.
+
+My celerity was:
+```
+sqrt(G * 8km) = 280.0 m/s
+```
+
+Plug that into the CFL Formula:
+```
+CFL = (280 m/s) * 900s / 300km = 0.84
+```
+
+That means that my maximum `u` could be:
+
+```
+1 = (u + 280 m/s) * 900s / 300km
+
+300km = 900u s + 252000 m
+
+48 km = 900u s
+
+53.3 m/s = u
+```
+
+Hmm, my `u` was set to 1 m/s. I wonder what happens if I half it?
+
+Not enough.
+
+https://www.io-warnemuende.de/tl_files/staff/burchard/pdf/Numerics_Shallow_Water.pdf
+
+I found this set of notes. They told me some super important things, like all
+the sets of CFL conditions for the 2d shallow water equations for all sorts of 
+grids for both static and rotating flows.
+
+The key piece of knowledge here is that the CFL needs to be less than `sqrt(1/2)`, not 1.
+That comes out to be something like 0.707.
+Now, if I solve for the max timestep with 1 m/s winds:
+
+```
+CFL = sqrt(1/2) <= (|u| + sqrt(g * h)) * dt / dx
+
+sqrt(1/2) <= (1 m/s + sqrt(g * 8km)) * dt / 300km
+
+0.707 <= (1 m/s + 280 m/s) * dt / 300km
+
+212.1 km <= (281 m/s) * dt 
+
+754.8 s = dt
+```
+
+I'll try 700 s.
+
+It worked!
 
 
 

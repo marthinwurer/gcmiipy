@@ -141,11 +141,11 @@ def matsumo_scheme(u, v, p, dx, dt):
 def main():
     side_len = 64
     dx = 300 * units.km
-    dt = 900 * units.s
+    dt = 100 * units.s
     half = side_len // 2
     u = np.zeros((side_len, side_len)) * units.m / units.s
     v = np.zeros((side_len, side_len)) * units.m / units.s
-    H = 1000 * units.m
+    H = 8000 * units.m
     p = np.zeros((side_len, side_len), dtype=np.float) * units.m
     p[:] = H
     # p[half: half + 2, half:half+2] += 1 * units.m

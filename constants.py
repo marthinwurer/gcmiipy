@@ -34,6 +34,9 @@ standard_temperature = 273.16 * units.K
 # gravity on earth
 G = 9.8 * units.m / units.s ** 2
 
+# radius of earth
+radius = 6.3781e6 * units.m
+
 # dynamic viscosity (mu) of dry air at STP
 mu_air = 18.5 * units.uPa * units.s
 
