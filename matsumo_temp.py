@@ -107,17 +107,40 @@ def gen_initial_conditions(side_len):
     return u, v, p, t
 
 
+def run_with_callbacks(i, u, v, p, t, dx, dt, callbacks=None):
+    if callbacks is None:
+        callbacks = []
+    u, v, p, t = matsumo_scheme(u, v, p, t, dx, dt)
+
+    for callback in callbacks:
+        callback(u, v, p, t, i)
+
+    return u, v, p, t
+
+
+def plot_callback(u, v, p, t, i):
+    quantity = p
+    plt.clf()
+    plt.imshow(quantity)
+    plt.title('n = %s' % (i,))
+    ax = plt.gca()
+    ax.format_coord = lambda x, y: f'{int(x + .5)} {int(y + .5)} {quantity[int(y + .5), int(x + .5)]}'
+    plt.show()
+    plt.pause(0.001)  # pause a bit so that plots are updated
+
+
 def main():
     side_len = 31
     u, v, p, t = gen_initial_conditions(side_len)
     dx = 300 * units.km
-    dt = 700 * units.s
+    dt = 300 * units.s
     half = side_len // 2
     H = standard_pressure
     # p[half: half + 2, half:half+2] += 1 * units.m
-    p[1, 2] += 1 * p.u
-    u[half, half] += .5 * units.m / units.s
+    # p[1, 2] += 1 * p.u
+    u[half, half] += 1.5 * units.m / units.s
     # v[half, half+2] += .2 * units.m / units.s
+    # t[half, half] -= 1 * units.K
 
     plt.ion()
     plt.figure()
@@ -130,13 +153,7 @@ def main():
 
     for i in tqdm.tqdm(range(30000)):
         # print("iteration %s" % i)
-        plt.clf()
-        plt.imshow(p)
-        plt.title('n = %s' % (i,))
-        ax = plt.gca()
-        ax.format_coord = lambda x, y: f'{int(x+.5)} {int(y+.5)} {p[int(x+.5), int(y+.5)]}'
-        plt.show()
-        plt.pause(0.001)  # pause a bit so that plots are updated
+        plot_callback(u, v, p, t, i)
 
         u, v, p, t = matsumo_scheme(u, v, p, t, dx, dt)
         print(f"Max u: {np.max(np.abs(u))}")

@@ -7,6 +7,19 @@ import numpy as np
 
 import constants
 
+"""
+Coordinates:
+I: x
+J: y
+L: layer (z)
+GCMII Grid: Arakawa B grid
+
+
+i    ih    ip
+P,T  PU     PRIMARY GRID ROW    j
+PV   U,V    SECONDARY GRID ROW  jmh  # WARNING: BACKWARDS FROM MINE
+"""
+
 v_dim = 16
 h_dim = 32
 
@@ -76,8 +89,8 @@ Time to break down GCMII's main time step code:
 
 U: horizontal velocity
 V: vertical velocity
-P: pressure
-PB: next pressure. Starts as a copy of P.
+P: Surface pressure
+PB: next surface pressure. Starts as a copy of P.
 DTFS: Change in time for the forward step
 UX: Copy of U
 VX: A global of shape V
@@ -115,6 +128,29 @@ FD: Scaling parameter. Scales with PA then unscales with PB
 
 """
 
+# decoding sigma
+"""
+DATA SIG/9*0.d0, 27*0./
+DATA SIGE/    1.,.948665,.866530,.728953,.554415,.390144,
+     *  .251540,.143737,.061602,28*0./
+SIG(L)=.5*(SIGE(L)+SIGE(L+1))
+"""
+sige = [
+    1.000000,
+    0.948665,
+    0.866530,
+    0.728953,
+    0.554415,
+    0.390144,
+    0.251540,
+    0.143737,
+    0.061602,
+    0.000000,
+]
+"""
+10 values for the edges of 9 layers
+sig is then the average, or sigma at the middle of that layer
+"""
 
 
 

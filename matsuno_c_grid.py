@@ -118,6 +118,10 @@ def advection_of_geopotential(u, v, p, dx):
     return finite
 
 
+def courant_number(p, u, dx, dt):
+    return ((np.max(u) + np.sqrt(np.mean(p) * G)) * dt / dx).to_base_units()
+
+
 def matsumo_scheme(u, v, p, dx, dt):
     u_star = u - dt * (advection_of_velocity_u(u, v, dx) +
                        geopotential_gradient_u(p, dx))
@@ -141,7 +145,7 @@ def matsumo_scheme(u, v, p, dx, dt):
 def main():
     side_len = 64
     dx = 300 * units.km
-    dt = 100 * units.s
+    dt = 300 * units.s
     half = side_len // 2
     u = np.zeros((side_len, side_len)) * units.m / units.s
     v = np.zeros((side_len, side_len)) * units.m / units.s
@@ -149,8 +153,8 @@ def main():
     p = np.zeros((side_len, side_len), dtype=np.float) * units.m
     p[:] = H
     # p[half: half + 2, half:half+2] += 1 * units.m
-    p[1, 2] += 1 * units.m
-    u[half,half] += 1 * units.m / units.s
+    # p[1, 2] += 1 * units.m
+    u[half,half] += 30 * units.m / units.s
 
     plt.ion()
     plt.figure()
@@ -164,18 +168,23 @@ def main():
     for i in tqdm.tqdm(range(30000)):
         # print("iteration %s" % i)
         plt.clf()
-        plt.imshow(p - H)
+        plt.imshow(u)
         plt.title('n = %s' % (i,))
         plt.show()
         plt.pause(0.001)  # pause a bit so that plots are updated
 
         u, v, p = matsumo_scheme(u, v, p, dx, dt)
+        print(courant_number(p, u, dx, dt))
         current_variation = get_total_variation(p)
         if current_variation.m > initial_variation.m + 0.1:
             print("iteration %s" % i)
             print("Variation too high: %s" % (current_variation,))
             # return False
             # break
+        if np.isnan(p).any():
+            print("iteration %s" % i)
+            print("NaN encountered")
+            break
     final_variation = get_total_variation(p)
     print("Initial Variation: %s Final Variation: %s" % (initial_variation, final_variation))
 

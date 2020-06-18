@@ -27,9 +27,16 @@ kappa = Rd / Cp
 # standard reference pressure
 P0 = 100000 * units.Pa  # 1000 hPa
 
+# non-standard reference pressure used by GCMII to simplify calculations
+p_0_k = (1 * units.Pa) ** kappa
+
 # standard pressure and temperature
 standard_pressure = 101325 * units.Pa
 standard_temperature = 273.16 * units.K
+
+# temperature of mesopause
+t_mesopause = 130 * units.K
+p_mesopause = 0.0005 * units.kPa
 
 # gravity on earth
 G = 9.8 * units.m / units.s ** 2
