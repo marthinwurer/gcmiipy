@@ -138,7 +138,7 @@ def unscaling(pb, qq, dx):
     return q
 
 
-def advecv(u, pu, p, pa, dt, dx):
+def advecv(ut, pu, p, pa, u, dt, dx):
     # TODO: add u_prev so matsuno can be done
     """
     i  h  ip   h
@@ -148,7 +148,7 @@ def advecv(u, pu, p, pa, dt, dx):
     """
     # FD(I,J)=PA(I,J)*DXYP(J)
     # UT(I,J,L)=UT(I,J,L)*FDU # fd at u
-    ut = scaling(p, u, dx)
+    ut_s = scaling(p, ut, dx)
 
     # pu is at iph, j
     """
@@ -177,7 +177,7 @@ def advecv(u, pu, p, pa, dt, dx):
 
     dut = (im(fluxu) - fluxu)  # dt that feels like it should be here is in fluxu calc
     # UT(I,J,L)=(UT(I,J,L)+DUT(I,J,L))*(1/PB(I,J)*DXYP(J))
-    ut_next = ut + dut
+    ut_next = ut_s + dut
     u_next = unscaling(pa, ut_next, dx)
 
     return u_next
@@ -199,7 +199,7 @@ c  **
     return t1 * g
 
 
-def pgf(u, ut, p, pa, t, dt, dx):
+def pgf(u, p, pa, t, dt, dx):
     # SHA=RGAS/KAPA
     sha = Rd / kappa
     # KAPAP1=KAPA+1.
@@ -277,7 +277,7 @@ def pgf(u, ut, p, pa, t, dt, dx):
     paph = iph(pa)
 
     # u_next = u + dut / paph #unscaling(paph, dut, dx)
-    u_next = ut + unscaling(paph, dut, dx)
+    u_next = u + unscaling(paph, dut, dx)
 
     return spa, theta, phi, geo, pg, u_next
 
@@ -320,8 +320,33 @@ def advecq(pu, pa, qt, pb, q, dt, dx):
     return qt_next
 
 
-def dynam_matsuno(u, p, t, dx, dt):
-    pass
+def dynam_matsuno(u, p, t, q, dt, dx):
+    pu, conv, pit = aflux(u, p, dx)
+
+    pa = advecm(p, pit, dt, dx * dx)
+
+    u_next = advecv(u, pu, p, pa, u, dt, dx)
+    t_star = advect(pu, p, t, pa, t, dt, dx)
+    q_star = advecq(pu, p, q, pa, q, dt, dx)
+    spa, theta, phi, geo, pg, u_star = pgf(u_next, p, pa, t, dt, dx)
+    p_star = pa
+
+    # second pass
+    pu, conv, pit = aflux(u_star, p_star, dx)
+    pa = advecm(p, pit, dt, dx * dx)
+
+    u_next = advecv(u, pu, p, pa, u_star, dt, dx)
+    t_next = advect(pu, p, t, pa, t_star, dt, dx)
+    q_next = advecq(pu, p, q, pa, q_star, dt, dx)
+    spa, theta, phi, geo, pg, u_next = pgf(u_next, p_star, pa, t, dt, dx)
+    p_next = pa
+
+    return u_next, p_next, t_next, q_next
+
+
+def advect_u_scaled(u, p, pa, dt, dx):
+    # TODO fix this
+    ut_scaled = scaling(iph(p), u, dx)
 
 
 

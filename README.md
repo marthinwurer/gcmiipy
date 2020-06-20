@@ -205,6 +205,12 @@ I'll try 700 s.
 
 It worked!
 
+## momentum terms
+
+The momentum terms actually need you to use the momentum.
+This means scaling everything by the pressure/density and area.
+Make sure to use the conservation form of the equations with p in the derivative.
+
 
 
 

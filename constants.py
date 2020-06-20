@@ -57,7 +57,11 @@ z_dim = -3
 Functions for using units with numpy helper functions
 """
 def unit_roll(a, shift, axis=None):
-    return np.roll(a.m, shift, axis=axis) * a.units
+    try:
+        return np.roll(a.m, shift, axis=axis) * a.units
+    except AttributeError:
+        return np.roll(a, shift, axis=axis)
+
 
 
 def unit_maximum(a, b):
