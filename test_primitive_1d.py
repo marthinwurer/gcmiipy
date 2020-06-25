@@ -192,6 +192,124 @@ class TestPrimOneD(unittest.TestCase):
         plt.ioff()
         plt.show()
 
+    def run_shallow(self, count, func, h, u, dx, dt):
+        plt.ion()
+        for i in tqdm(range(count)):
+            # h, u = advect_matsumo(h, u, dt, dx)
+            h, u = func(h, u, dt, dx)
+            plot_callback(h)
+            if np.isnan(h).any():
+                # print("iteration %s" % i)
+                print("NaN encountered")
+                break
+
+            c = courant_number(h, u, dx, dt)
+            if c > .35:
+                print("courant too high:", c)
+
+        c = courant_number(h, u, dx, dt)
+        print("final courant:", c)
+
+        plt.ioff()
+        plt.show()
+        return h, u
+
+    def test_shallow_1d(self):
+        side_len = 100
+        u = np.full((side_len,), 0.0) * units.m / units.s
+        h = np.full((side_len,), 10.0) * units.m
+        dx = 300000 * units.m
+        dt = 900 * units.s
+
+        u[-1] = 0 * u.u
+        h[:50] = 20 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        self.assertLess(c.m, 0.35)
+
+        plt.ion()
+        for i in tqdm(range(10000)):
+            # h, u = advect_matsumo(h, u, dt, dx)
+            h, u = shallow_water_matsuno(h, u, dt, dx)
+            plot_callback(h)
+            if np.isnan(h).any():
+                # print("iteration %s" % i)
+                print("NaN encountered")
+                break
+
+            c = courant_number(h, u, dx, dt)
+            if c > .35:
+                print("courant too high:", c)
+
+        c = courant_number(h, u, dx, dt)
+        print("final courant:", c)
+
+        plt.ioff()
+        plt.show()
+
+
+    def test_advect_maccormack(self):
+        side_len = 100
+        u = np.full((side_len,), 10.0) * units.m / units.s
+        h = np.full((side_len,), 10.0) * units.m
+        dx = 300000 * units.m
+        dt = 900 * units.s
+
+        # u[-1] = 0 * u.u
+        h[25:50] = 20 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        h, u = self.run_shallow(1000, advect_maccormack, h, u, dx, dt)
+
+
+
+"""
+Some good tests from a real CFD guy:
+
+You want to show that the theoretical convergence rate matches the computed rate.
+So, you need an exact solution of the Navier-Stokes equations.
+These are not easy to come by but there are some for different geometries.
+For 1D there are a lot.
+For 2D incompressible, I've used variants of the Taylor-Green vortex problem.
+https://en.wikipedia.org/wiki/Taylor%E2%80%93Green_vortex
+When you have your exact solution, you compute the "error", which is the difference between the exact and computational result.
+Then you vary your grid spacing while keeping the time step constant. You need to pick a time step that will be stable for all grids tested.
+Plot the error as a function of the grid spacing.
+For a second order scheme you should see that the error asymptotically approaches O(dx^2).
+If you don't see that it's possible that you have a bug or need to use a smaller grid.
+This is called "verification testing".
+There's also "validation testing" and "uncertainty quantification".
+And you can apply ideas like unit tests, integration tests, etc., but those are orthogonal to everything else I just mentioned.
+
+This one is famous for compressible flow but I can't vouch for how useful it is: https://en.wikipedia.org/wiki/Sod_shock_tube
+http://www.cfdbooks.com/
+Volume 1 listed here has a ton of exact solutions that you can use for code testing.
+
+
+Stuff I found:
+https://www.sciencedirect.com/science/article/pii/S1674237018300255
+Has initial conditions for a dam break
+
+https://www.reading.ac.uk/web/files/maths/02-99.pdf
+Has a few problems with initial conditions and analytical solutions
+
+https://pdfs.semanticscholar.org/46ef/e430659baa9dcd3e138e6bf836dca91fa544.pdf
+discusses some
+
+https://www.cambridge.org/core/journals/acta-numerica/article/finitevolume-schemes-for-shallowwater-equations/AE2AC80D1E6E9F6BC0E68496A1C3EC52/core-reader
+interesting, discusses the effects of water edges.
+q is discharge = h * v (defined after 2.4)
+talks about dealing with shallow water edges. draining time steps looks cool.
+
+https://sci-hub.tw/https://ascelibrary.org/doi/full/10.1061/%28ASCE%29HY.1943-7900.0001683
+analytical solution for dam break
+
+
+
+
+"""
 
 
 

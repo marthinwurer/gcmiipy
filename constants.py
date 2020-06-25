@@ -80,3 +80,9 @@ def get_total_variation(q):
     q_p_1 = unit_roll(q, -1, 0)
     diff = q - q_p_1
     return np.sum(np.abs(diff.m)) * q.u
+
+
+def courant_number(p, u, dx, dt):
+    return ((np.max(u) + np.sqrt(np.mean(p) * G)) * dt / dx).to_base_units()
+
+
