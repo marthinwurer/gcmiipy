@@ -263,6 +263,19 @@ class TestPrimOneD(unittest.TestCase):
         print("initial courant:", c)
         h, u = self.run_shallow(1000, advect_maccormack, h, u, dx, dt)
 
+    def test_advect_lax_friedrichs(self):
+        side_len = 100
+        u = np.full((side_len,), 10.0) * units.m / units.s
+        h = np.full((side_len,), 10.0) * units.m
+        dx = 300000 * units.m
+        dt = 900 * units.s
+
+        # u[-1] = 0 * u.u
+        h[25:50] = 20 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        h, u = self.run_shallow(1000, advect_lax_friedrichs, h, u, dx, dt)
 
 
 """

@@ -21,10 +21,11 @@ def calc_r(q):
 
 
 def donor_cell_flux(q, u):
-    q_edge = np.where(u > 0, q, ip(q)) * q.u
+    q_edge = np.where(u > 0, q.m, ip(q)) * q.u
     flux = q_edge * u
 
     return flux
+
 
 def donor_cell_advection(q, u, dx, dt):
     flux = donor_cell_flux(q, u)
