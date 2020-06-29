@@ -102,19 +102,61 @@ def shallow_water_maccormack(h, u, dt, dx):
     pass
 
 
+def lf_flux(h, u, dt, dx):
+    # find the flux at plus half
+    flux = u * iph(h) - dx / (2 * dt) * (ip(h) - h)
+    return flux
+
+
 def advect_lax_friedrichs(rho, u, dt, dx):
-    rho_next = (ip(rho) + im(rho)) / 2 - advect_rho(rho, u, dx) * dt
+    flux = lf_flux(rho, u, dt, dx)
+    rho_next = rho - dt / dx * (flux - im(flux))
     u_next = u
 
     return rho_next, u_next
 
 
-from flux_limiter import donor_cell_flux, donor_cell_advection
+from flux_limiter import donor_cell_flux
+
 
 def advect_upwind(rho, u, dt, dx):
-    flux = donor_cell_flux(rho, u)
-    #todo finish this
+    flux = donor_cell_flux(rho, u)  # flux at plus half
 
+    rho_next = rho - dt / dx * (flux - im(flux))
+    u_next = u
+
+    return rho_next, u_next
+
+
+def shallow_water_upwind(rho, u, dt, dx):
+    flux = donor_cell_flux(rho, u)  # flux at plus half
+
+    rho_next = rho - dt / dx * (flux - im(flux))
+    # TODO change u
+    ut = u * iph(rho)
+    fluxu = donor_cell_flux(ut, iph(u))
+    du_advect = dt / dx * (fluxu - im(fluxu))
+    geo_diff = (ip(rho) - rho) / dx * G * dt * iph(rho)
+    ut_next = ut - du_advect - geo_diff
+    u_next = ut_next / iph(rho_next)
+
+    return rho_next, u_next
+
+
+def shallow_water_upwind_boundary(rho, u, dt, dx):
+    flux = donor_cell_flux(rho, u)  # flux at plus half
+
+    rho_next = rho - dt / dx * (flux - im(flux))
+    ut = u * iph(rho)
+    fluxu = donor_cell_flux(ut, iph(u))
+    du_advect = dt / dx * (fluxu - im(fluxu))
+    geo_diff = (ip(rho) - rho) / dx * G * dt * iph(rho)
+    ut_next = ut - du_advect - geo_diff
+    u_next = ut_next / iph(rho_next)
+
+    u_next[-1] = 0 * u.u
+
+    return rho_next, u_next
 
 
 

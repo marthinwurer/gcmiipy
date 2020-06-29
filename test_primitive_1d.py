@@ -277,6 +277,48 @@ class TestPrimOneD(unittest.TestCase):
         print("initial courant:", c)
         h, u = self.run_shallow(1000, advect_lax_friedrichs, h, u, dx, dt)
 
+    def test_advect_upwind(self):
+        side_len = 100
+        u = np.full((side_len,), 10.0) * units.m / units.s
+        h = np.full((side_len,), 10.0) * units.m
+        dx = 300000 * units.m
+        dt = 900 * units.s
+
+        # u[-1] = 0 * u.u
+        h[25:50] = 20 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        h, u = self.run_shallow(1000, advect_upwind, h, u, dx, dt)
+
+    def test_shallow_upwind(self):
+        side_len = 100
+        u = np.full((side_len,), 10.0) * units.m / units.s
+        h = np.full((side_len,), 10.0) * units.m
+        dx = 300000 * units.m
+        dt = 900 * units.s
+
+        # u[-1] = 0 * u.u
+        h[25:50] = 20 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        h, u = self.run_shallow(1000, shallow_water_upwind, h, u, dx, dt)
+
+    def test_dam_break_upwind(self):
+        side_len = 100
+        u = np.full((side_len,), 0.0) * units.m / units.s
+        h = np.full((side_len,), 0.5) * units.m
+        dx = 1/side_len * units.m
+        dt = 0.0001 * units.s
+
+        # u[-1] = 0 * u.u
+        h[:50] = 1 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        h, u = self.run_shallow(1000, shallow_water_upwind_boundary, h, u, dx, dt)
+
 
 """
 Some good tests from a real CFD guy:
