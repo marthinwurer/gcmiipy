@@ -6,6 +6,7 @@ from tqdm import tqdm
 from constants import *
 from matsuno_c_grid import courant_number
 from primitive_1d import *
+from port_one_d import *
 
 side_len = 8
 
@@ -18,6 +19,15 @@ def plot_callback(q):
     # ax.format_coord = lambda x, y: f'{int(x + .5)} {int(y + .5)} {quantity[int(y + .5), int(x + .5)]}'
     plt.show()
     plt.pause(0.001)  # pause a bit so that plots are updated
+
+
+def plot_with_bed(h, u, b, dx, dt):
+    plt.clf()
+    plt.plot(h + b)
+    plt.plot(b)
+    plt.show()
+    plt.pause(0.001)  # pause a bit so that plots are updated
+
 
 
 class TestPrimOneD(unittest.TestCase):
@@ -318,6 +328,93 @@ class TestPrimOneD(unittest.TestCase):
         c = courant_number(h, u, dx, dt)
         print("initial courant:", c)
         h, u = self.run_shallow(1000, shallow_water_upwind_boundary, h, u, dx, dt)
+
+    def test_shallow_with_flat_bed(self):
+        side_len = 100
+        u = np.full((side_len,), 0.0) * units.m / units.s
+        h = np.full((side_len,), 0.5) * units.m
+        b = np.full((side_len,), 0.5) * units.m
+        dx = 1/side_len * units.m
+        dt = 0.0001 * units.s
+
+        # u[-1] = 0 * u.u
+        h[:50] = 1 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        plt.ion()
+        h, u = run_shallow_with_bed(1000, shallow_water_bed_upwind_boundary, h, u, b, dt, dx, [plot_with_bed])
+        plt.ioff()
+        plt.show()
+
+    def test_shallow_with_hump_bed(self):
+        side_len = 100
+        b = np.full((side_len,), 0.0) * units.m
+        b[20:40] = 0.5 * b.u
+        u = np.full((side_len,), 0.0) * units.m / units.s
+        h = np.full((side_len,), 1.0) * units.m
+        h = h - b
+
+        dx = 1/side_len * units.m
+        dt = 0.0001 * units.s
+
+        # u[-1] = 0 * u.u
+        # h[:50] = 1 * h.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        plt.ion()
+        h, u = run_shallow_with_bed(1000, shallow_water_bed_upwind_boundary, h, u, b, dt, dx, [plot_with_bed])
+        plt.ioff()
+        plt.show()
+
+    def test_shallow_with_linear_bed(self):
+        side_len = 100
+        dt = 0.0001 * units.s
+        dx = 1/side_len * units.m
+        b = np.full((side_len,), 0.0) * units.m
+        for x in range(b.shape[0]):
+            b[x] = x * dx / 2
+
+        u = np.full((side_len,), 0.0) * units.m / units.s
+        h = np.full((side_len,), 0.5) * units.m
+        h[:50] = 1 * h.u
+        h = np.maximum(0, (h - b).m) * h.u
+
+
+        # u[-1] = 0 * u.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        plt.ion()
+        h, u = run_shallow_with_bed(1000, shallow_water_bed_upwind_boundary, h, u, b, dt, dx, [plot_with_bed])
+        plt.ioff()
+        plt.show()
+
+    def test_shallow_with_linear_bed_above(self):
+        side_len = 100
+        dt = 0.001 * units.s
+        dx = 1/side_len * units.m
+        b = np.full((side_len,), 0.0) * units.m
+        for x in range(b.shape[0]):
+            b[x] = x * dx
+
+        u = np.full((side_len,), 0.0) * units.m / units.s
+        h = np.full((side_len,), 0.5) * units.m
+        h[:25] = 1 * h.u
+        h = np.maximum(0, (h - b).m) * h.u
+
+
+        # u[-1] = 0 * u.u
+
+        c = courant_number(h, u, dx, dt)
+        print("initial courant:", c)
+        plt.ion()
+        with np.errstate(divide='raise'):
+            h, u = run_shallow_with_bed(1000, shallow_water_bed_upwind_boundary, h, u, b, dt, dx, [plot_with_bed])
+        plt.ioff()
+        plt.show()
+
 
 
 """

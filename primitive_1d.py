@@ -7,6 +7,8 @@ j  P U P
 
 U is effectively at iph
 """
+from tqdm import tqdm
+
 from coordinates_1d import *
 from constants import *
 
@@ -159,6 +161,46 @@ def shallow_water_upwind_boundary(rho, u, dt, dx):
     return rho_next, u_next
 
 
+def run_shallow_with_bed(count, func, h, u, b, dt, dx, callbacks=None):
+    if callbacks is None:
+        callbacks = []
+
+    for i in tqdm(range(count)):
+        # h, u = advect_matsumo(h, u, dt, dx)
+        h, u = func(h, u, b, dt, dx)
+        if np.isnan(h).any():
+            # print("iteration %s" % i)
+            print("NaN encountered")
+            break
+
+        for callback in callbacks:
+            callback(h, u, b, dt, dx)
+
+
+        c = courant_number(h, u, dx, dt)
+        if c > .35:
+            print("courant too high:", c)
+
+    c = courant_number(h, u, dx, dt)
+    print("final courant:", c)
+
+    return h, u
+
+def shallow_water_bed_upwind_boundary(h, u, b, dt, dx):
+    flux = donor_cell_flux(h, u)  # flux at plus half
+
+    h_next = h - dt / dx * (flux - im(flux))
+    ut = u * iph(h)
+    fluxu = donor_cell_flux(ut, iph(u))
+    du_advect = dt / dx * (fluxu - im(fluxu))
+    geo = h + b
+    geo_diff = (ip(geo) - geo) / dx * G * dt * iph(h)
+    ut_next = ut - du_advect - geo_diff
+    u_next = safe_div(ut_next, iph(h_next))
+
+    u_next[-1] = 0 * u.u
+
+    return h_next, u_next
 
 
 

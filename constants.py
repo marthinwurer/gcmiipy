@@ -86,3 +86,7 @@ def courant_number(p, u, dx, dt):
     return ((np.max(u) + np.sqrt(np.mean(p) * G)) * dt / dx).to_base_units()
 
 
+def safe_div(a, b):
+    c = np.divide(a.m, b.m, out=np.zeros_like(a), where=(b.m != 0)) * a.u / b.u
+    return c
+
