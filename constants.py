@@ -90,3 +90,7 @@ def safe_div(a, b):
     c = np.divide(a.m, b.m, out=np.zeros_like(a), where=(b.m != 0)) * a.u / b.u
     return c
 
+
+def potential_temp_to_temp(p, t):
+    return t / (P0 / p) ** kappa
+

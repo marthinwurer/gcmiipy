@@ -36,3 +36,18 @@ def iph(q):
 
 def imh(q):
     return (q + im(q)) / 2
+
+
+def div(q_h, dx):
+    return (q_h - im(q_h)) / dx
+
+
+def divu(q_h, dx):
+    return (ip(q_h) - im(q_h)) / (2 * dx)
+
+
+def gradh(q_i, dx):
+    """
+    Gradient at h of q_i
+    """
+    return (ip(q_i) - q_i) / dx
