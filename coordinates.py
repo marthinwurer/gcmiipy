@@ -48,3 +48,32 @@ def ijm(q):
 def imjp(q):
     return imj(ijp(q))
 
+
+def iph(q):
+    return (q + ipj(q)) / 2
+
+
+def imh(q):
+    return (q + imj(q)) / 2
+
+
+def jph(q):
+    return (q + ijp(q)) / 2
+
+
+def jmh(q):
+    return (q + ijm(q)) / 2
+
+
+def gradi(q_i, dx):
+    """
+    Gradient at h of q_i
+    """
+    return (ipj(q_i) - q_i) / dx
+
+
+def gradj(q_j, dy):
+    """
+    Gradient at h of q_i
+    """
+    return (ijp(q_j) - q_j) / dy

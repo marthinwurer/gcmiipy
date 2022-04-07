@@ -115,7 +115,7 @@ def half_timestep(p, u, t, q, sp, su, st, sq, dt, dx):
     # start with advection of a tracer (q)
     # p_h = iph(p)
     # sp_h = iph(sp)
-    pq = p * q
+    # pq = p * q
 
     # div_pq = div(pq, dx)
 
@@ -124,14 +124,14 @@ def half_timestep(p, u, t, q, sp, su, st, sq, dt, dx):
 
     q_n = q - advec_q(su, sq, dx) * dt
 
-    f_p = advec_p(spu, dx) * dt
-    print("max advec_p", max(f_p))
+    # f_p = advec_p(spu, dx) * dt
+    # print("max advec_p", max(f_p))
     p_n = p - advec_p(spu, dx) * dt
 
     # f_pu = un_pu(advec_pu(sp, spu, su, dx) * dt, p_n)
     # f_pu_old = un_pu(advec_pu(sp, spu, su, dx) * dt, p)
-    f_pgf = un_pu(pgf(sp, st, dx), p_n) * dt
-    print("max pgf", max(f_pgf))
+    # f_pgf = un_pu(pgf(sp, st, dx), p_n) * dt
+    # print("max pgf", max(f_pgf))
     pu_n = pu - (advec_pu(sp, spu, su, dx) + pgf(sp, st, dx)) * dt
 
     u_n = un_pu(pu_n, p_n)
@@ -210,10 +210,26 @@ class TestBasicDiscretizaion(unittest.TestCase):
         u = np.full(side_len, 1) * 1.0 * units.m / units.s
         q = np.full(side_len, 1) * 0.1 * units.dimensionless
         t = np.full(side_len, 1) * temperature.to_potential_temp(standard_temperature, p)
-        dx = 100 * units.m
-        dt = 0.1 * units.s
+        dx = 1000000 * units.m
+        dt = 60. * 15 * units.s
 
-        p[3] *= 1.001
+        # ok, 0.17s at 100m and 2m/s is the edge of stability.
+        # 0.1s and 334m/s is also the edge of stability.
+        # What's the actual stability formula here?
+        # well, with the standard cfl we get 0.0034 for 0.17, 100m, and 2m/s
+        # now, with 1.7s and 100m and 2m/s, we're barely stable
+        # with it bumped up to 4 m/s, it's still stable. interesting.
+        # bumped up to 250m/s, still stable. this is wild.
+        # 275 is barely stable, 280 barely counts, 290,
+        # 295 is the last one that stabilizes
+        # 10km, 10.7s, 296m/s
+        # 17s fails, 16s barely stabilizes
+        # 100km, 15min, 296 works.
+
+
+        # p[3] *= 1.00001
+        u[3] *= 296
+        # ok, CFL for this is sqrt(2)/4
 
         # t[2] += 1 * standard_temperature.units
         q[side_len//4:side_len//2] = 1
@@ -224,7 +240,7 @@ class TestBasicDiscretizaion(unittest.TestCase):
         for i in tqdm(range(100000)):
             p, u, t, q = matsuno_timestep(p, u, t, q, dt, dx)
 
-            plot_callback(temperature.to_true_temp(t, p).m)
+            plot_callback(p.m)
             if np.isnan(u).any() != False:
                 break
 
