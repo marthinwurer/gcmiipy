@@ -15,6 +15,10 @@ def to_potential_temp(tt, p):
     return t
 
 
+def to_density(tt, p):
+    rho = p / (constants.Rd * tt)
+    return rho
+
 
 
 

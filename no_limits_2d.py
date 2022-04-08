@@ -120,8 +120,8 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, dx):
 
     t_n = t - (advec_t(spu, spv, st, dx) / p_n) * dt
 
-    v_n[-1, :] *= 0
-    u_n[:, -1] *= 0
+    # v_n[-1, :] *= 0
+    # u_n[:, -1] *= 0
 
     return (p_n, u_n, v_n, t_n, q)
 
