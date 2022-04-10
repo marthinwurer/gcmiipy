@@ -15,6 +15,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 import constants
+import low_pass
 from coordinates import *
 from constants import *
 import temperature
@@ -57,6 +58,7 @@ def advec_m(p, u, v, geom):
     p_mid = iph(jph(p))
 
     puum = imh(u) ** 2 * p
+    puum = low_pass.avrx(puum, geom)
     puup = ipj(puum)
     # puvm is at j-h, i+h
     puvm = jmh(u) * ijm(vph) * ijm(p_mid)
@@ -68,8 +70,41 @@ def advec_m(p, u, v, geom):
     pvvp = ijp(pvvm)
     # pvum is at i-h, j+h
     pvum = imj(p_mid) * imh(v) * imj(jph(u))
+    # TODO I might have to use pu for this function instead to deal with this stuff
+    pvum = low_pass.avrx(pvum, geom)
     pvup = ipj(pvum)
 
+    dvt = (pvvm - pvvp) / geom.dy + (pvum - pvup) / geom.dx_h
+
+    return (dut, dvt)
+
+
+def advec_m_pu(p, u, v, pu, pv, geom):
+    # puum = imh(u) ** 2 * p
+    puum = imh(u) * imh(pu)
+    puup = ipj(puum)
+
+    # # puvm is at j-h, i+h
+    # puvp should be at jph, iph
+    # pv is at i, j+h
+    # puvm = jmh(u) * ijm(vph) * ijm(p_mid)
+    # puvp = ipj(puvm)
+    puvp = iph(pv) * jph(u)
+    puvm = ijm(puvp)
+
+
+    # v, pv: i, jph
+    # pu: iph, j
+    # pvvm i, j
+    # pvvp i, jp1
+    # pvum imh, jph
+    # pvup iph, jph
+    pvvm = jmh(v) * jmh(pv)
+    pvvp = ijp(pvvm)
+    pvup = iph(v) * jph(pu)
+    pvum = imj(pvup)
+
+    dut = (puum - puup) / geom.dx_j + (puvm - puvp) / geom.dy
     dvt = (pvvm - pvvp) / geom.dy + (pvum - pvup) / geom.dx_h
 
     return (dut, dvt)
@@ -104,15 +139,22 @@ def advec_t(pu, pv, t, geom):
 
 
 def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
+    # u = low_pass.avrx(u, geom)
+    # su = low_pass.avrx(su, geom)
     pu = calc_pu(p, u)
-    spu = calc_pu(sp, su)
+    spu_orig = calc_pu(sp, su)
+    # pu = low_pass.avrx(pu_orig, geom)
+    spu = low_pass.arakawa_1977(spu_orig, geom)
     pv = calc_pv(p, v)
     spv = calc_pv(sp, sv)
 
     p_n = p - advec_p(spu, spv, geom) * dt
 
-    dut, dvt = advec_m(sp, su, sv, geom)
+    # dut, dvt = advec_m(sp, su, sv, geom)
+    dut, dvt = advec_m_pu(sp, su, sv, spu, spv, geom)
     pgu, pgv = pgf(sp, st, geom)
+
+    pgu = low_pass.arakawa_1977(pgu, geom)
 
     pu_n = pu - (dut + pgu) * dt
     pv_n = pv - (dvt + pgv) * dt
@@ -260,13 +302,15 @@ class TestBasicDiscretizaion(unittest.TestCase):
         q = np.full((height, width), 1) * 0.1 * units.dimensionless
         t = np.full((height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
         dx = 100 * units.m
-        dt = 60 * units.s
+        dt = 60 * 15 * units.s
 
         # p[10, 10, 0] *= 1.01
         # u[0, 3, 0] *= 200
         # t[3, 3, 0] *= 1.1
         p[10, 10] *= 1.01
+        u[:, 12] *= 2
         u[1, 3] *= 2
+        v[18, 18] = 1 * units.m / units.s
         t[3, 3] *= 1.1
         # u[3] *= 2
         # ok, CFL for this is sqrt(2)/4
@@ -275,6 +319,15 @@ class TestBasicDiscretizaion(unittest.TestCase):
         # q[side_len//4:side_len//2] = 1
         # q[2] = 1
         # u[1] += .1 * u.units
+
+        # orig_u = u
+        # u = low_pass.avrx(u, geom)
+        # plt.imshow((orig_u - u).m)
+        # plt.ioff()
+        # plt.show()
+        # plt.plot(u[1])
+        # plt.plot(orig_u[1])
+        # plt.show()
 
         plt.ion()
         for i in tqdm(range(100000)):

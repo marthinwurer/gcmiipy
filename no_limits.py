@@ -26,6 +26,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 import constants
+import low_pass
 from coordinates_1d import *
 from constants import *
 import temperature
@@ -211,7 +212,7 @@ class TestBasicDiscretizaion(unittest.TestCase):
         q = np.full(side_len, 1) * 0.1 * units.dimensionless
         t = np.full(side_len, 1) * temperature.to_potential_temp(standard_temperature, p)
         dx = 70000 * units.m
-        dt = 60. * 2.08 * units.s
+        dt = 60. * 15 * units.s
 
         # ok, 0.17s at 100m and 2m/s is the edge of stability.
         # 0.1s and 334m/s is also the edge of stability.
@@ -226,7 +227,7 @@ class TestBasicDiscretizaion(unittest.TestCase):
         # 17s fails, 16s barely stabilizes
         # 100km, 15min, 296 works.
 
-        p = p / 2.
+        # p = p / 2.
         p[3] *= 1.00001
         # u[3] *= 1.001
         # ok, CFL for this is sqrt(2)/4
@@ -237,10 +238,11 @@ class TestBasicDiscretizaion(unittest.TestCase):
         # the limiting factor will be the gravity waves CFL term.
         # in full it's actually c = u +- sqrt(gH)
         # from https://www2.atmos.umd.edu/~ekalnay/syllabi/AOSC614/NWP-CH03-2-4.pdf
-        # We may assume  ̄u < 100 m/s and sqrt(gH) < 300 m/s , so a safe
+        # We may assume u < 100 m/s and sqrt(gH) < 300 m/s, so a safe
         # maximum value for c is 400 m/s
         # GCMII solves this by low pass filtering the gravity waves when
         # the dx is too small for the timestep
+        # ok, so the if we want to find dt, then we do CFL * dx / c
 
         # t[2] += 1 * standard_temperature.units
         q[side_len//4:side_len//2] = 1
@@ -249,6 +251,18 @@ class TestBasicDiscretizaion(unittest.TestCase):
 
         plt.ion()
         for i in tqdm(range(100000)):
+            # test filtering with an averaging filter
+            print(max(u))
+            # we want to filter out waves faster than the vertial difference
+            # frequency, which at 15m and 1/24 of circumfrence is 833km over 15min,
+            # which has
+            # u = low_pass.butter_lowpass_filter(u,  )
+            # u = (u + ip(u) + im(u)) / 3
+            # u = (u + ip(u) + im(u)) / 3
+            # u = (u + ip(u) + im(u)) / 3
+            # u = (u + ip(u) + im(u)) / 3
+            print(max(u))
+
             p, u, t, q = matsuno_timestep(p, u, t, q, dt, dx)
             print(max(p))
 
