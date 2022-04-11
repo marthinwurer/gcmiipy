@@ -93,42 +93,42 @@ def advec_sig(sd, q, geom):
 
 
 
-def advec_p(pu, pv, geom):
+# def advec_p(pu, pv, geom):
+    #
+    # dp = (pu - imj(pu)) / geom.dx_j + (pv - ijm(pv)) / geom.dy
+    # return dp
 
-    dp = (pu - imj(pu)) / geom.dx_j + (pv - ijm(pv)) / geom.dy
-    return dp
 
-
-def advec_m(p, u, v, geom):
-    """
-       i h ip
-    j  P U P
-    h  V   V
-    jp P U P
-    """
-    vph = iph(v)
-    p_mid = iph(jph(p))
-
-    puum = imh(u) ** 2 * p
-    puum = low_pass.avrx(puum, geom)
-    puup = ipj(puum)
-    # puvm is at j-h, i+h
-    puvm = jmh(u) * ijm(vph) * ijm(p_mid)
-    puvp = ipj(puvm)
-
-    dut = (puum - puup) / geom.dx_j + (puvm - puvp) / geom.dy
-
-    pvvm = jmh(v) ** 2 * p
-    pvvp = ijp(pvvm)
-    # pvum is at i-h, j+h
-    pvum = imj(p_mid) * imh(v) * imj(jph(u))
-    # TODO I might have to use pu for this function instead to deal with this stuff
-    pvum = low_pass.avrx(pvum, geom)
-    pvup = ipj(pvum)
-
-    dvt = (pvvm - pvvp) / geom.dy + (pvum - pvup) / geom.dx_h
-
-    return (dut, dvt)
+# def advec_m(p, u, v, geom):
+#     """
+#        i h ip
+#     j  P U P
+#     h  V   V
+#     jp P U P
+#     """
+#     vph = iph(v)
+#     p_mid = iph(jph(p))
+#
+#     puum = imh(u) ** 2 * p
+#     puum = low_pass.avrx(puum, geom)
+#     puup = ipj(puum)
+#     # puvm is at j-h, i+h
+#     puvm = jmh(u) * ijm(vph) * ijm(p_mid)
+#     puvp = ipj(puvm)
+#
+#     dut = (puum - puup) / geom.dx_j + (puvm - puvp) / geom.dy
+#
+#     pvvm = jmh(v) ** 2 * p
+#     pvvp = ijp(pvvm)
+#     # pvum is at i-h, j+h
+#     pvum = imj(p_mid) * imh(v) * imj(jph(u))
+#     # TODO I might have to use pu for this function instead to deal with this stuff
+#     pvum = low_pass.avrx(pvum, geom)
+#     pvup = ipj(pvum)
+#
+#     dvt = (pvvm - pvvp) / geom.dy + (pvum - pvup) / geom.dx_h
+#
+#     return (dut, dvt)
 
 
 def advec_m_pu(p, u, v, pu, pv, geom):
