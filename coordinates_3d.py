@@ -60,6 +60,10 @@ def km(q):
     return unit_roll(q, 1, k_axis)
 
 
+def kph(q):
+    return (q + kp(q)) / 2
+
+
 def kmh(q):
     return (q + km(q)) / 2
 

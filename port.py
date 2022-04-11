@@ -459,17 +459,95 @@ def PGF(UT,VT,PB,U,V,T,P,DT1):
 C**** THIS SUBROUTINE ADDS TO MOMENTUM THE TENDENCIES DETERMINED BY     2503.
 C**** THE PRESSURE GRADIENT FORCE                                       2504.
     """
+    SHA = RGAS/KAPA
+    KAPAP1 = KAPA + 1
+    JMM2 = JM - 2
+    DT2=DT1/2.
+    DT4=DT1/4.
+
+    """
+C****                                                                   2521.
+C**** VERTICAL DIFFERENCING                                             2522.
+C****                                                                   2523.
+      IMAX=1                                                            2524.
+      DO 3071 J=1,JM                                                    2525.
+      IF(J.EQ.JM) IMAX=1                                                2526.
+      DO 3070 I=1,IMAX                                                  2527.
+      SUM1=0.                                                           2528.
+      SUM2=0.                                                           2529.
+      SP=P(I,J)                                                         2530.
+      PDN=SIG(1)*SP+PTOP                                                2531.
+      PKDN=EXPBYK(PDN)                                                  2532.
+      DO 3040 L=1,LM-1                                                  2533.
+      LP1=L+1                                                           2534.
+    """
+
+    IMAX = 1
+    for J in range(JM):
+        if J == JM - 1:
+            IMAX = 1
+        for I in range(IMAX):
+            SUM1 = 0.
+            SUM2 = 0.
+            SP = P[I, J]
+            PDN = SIG(1) * SP + PTOP
+            PKDN = EXPBYK(PDN)
+            for L in range(LM - 1):
+                LP1 = L + 1
+                """
+C**** CALCULATE SPA                                                     2535.
+      SPA(I,J,L)=SIG(L)*SP*RGAS*T(I,J,L)*PKDN/PDN                       2536.
+      SUM1=SUM1+SPA(I,J,L)*DSIG(L)                                      2537.
+      PUP=SIG(LP1)*SP+PTOP                                              2538.
+      PKUP=EXPBYK(PUP)                                                  2539.
+      THETA=THBAR(T(I,J,LP1),T(I,J,L))                                  2540.
+                """
+                SPA[I, J, L] = SIG[L] * SP * RGAS * T[I, J, L] * PKDN / PDN
+                SUM1 = SUM1 + SPA[I, J, L] * DSIG[L]
+                PUP = SIG[LP1] * SP + PTOP
+                PKUP = EXPBYK(PUP)
+                THETA = THBAR(T[I, J, LP1], T[I, J, L])
+                """
+C**** CALCULATE THE DIFFERENCE IN PHI BETWEEN ODD LEVELS LP1 AND L      2541.
+      PHI(I,J,LP1)=SHA*THETA*(PKDN-PKUP)                                2542.
+      SUM2=SUM2+SIGE(LP1)*PHI(I,J,LP1)                                  2543.
+      PDN=PUP                                                           2544.
+ 3040 PKDN=PKUP                                                         2545.
+                """
+                PHI[I, J, LP1] = SHA * THETA * (PKDN - PKUP)
+                SUM2 = SUM2 + SIGE[LP1] * PHI[I, J, LP1]
+                PDN = PUP
+                PKDN = PKUP
+            """
+      SPA(I,J,LM)=SIG(LM)*SP*RGAS*T(I,J,LM)*PKDN/PDN                    2546.
+      SUM1=SUM1+SPA(I,J,LM)*DSIG(LM)                                    2547.
+ 3050 PHI(I,J,1)=FDATA(I,J,1)+SUM1-SUM2                                 2548.
+            """
+            SPA[I, J, LM] = SIG[LM] * SP * RGAS * T[I, J, LM] * PKDN / PDN
+            SUM1 = SUM1 + SPA[I, J, LM] * DSIG[LM]
+            PHI[I, J, 1] = FDATA[I, J, 1] + SUM1 - SUM2
+            """
+          DO 3070 L=2,LM                                                    2549.
+     3070 PHI(I,J,L)=PHI(I,J,L)+PHI(I,J,L-1)                                2550.
+            """
+            for L in range(1, LM):
+                PHI[I, J, L] = PHI[I, J, L] + PHI[I, J, L - 1]
+    # TODO the rest of this
+
+
 
 def ADVECT(PA,TT,PB,T,DT1):
     """
 C**** THIS SUBROUTINE ADVECTS POTENTIAL TEMPERATURE                     3003.
     """
 
+
 def ADVECQ(PA,QT,PB,Q,DT1):
     """
 C**** THIS SUBROUTINE ADVECTS HUMIDITY AS DETERMINED BY DT1 AND THE     3503.
 C**** CURRENT AIR MASS FLUXES
     """
+
 
 def AVRX(PU):
     """
@@ -478,11 +556,13 @@ C**** GRADIENTS NEAR THE POLES TO HELP AVOID COMPUTATIONAL INSTABILITY. 1804.
 C**** THIS VERSION OF AVRX DOES SO BY TRUNCATING THE FOURIER SERIES.    1805.
     """
 
+
 def SDRAG():
     """
 C**** THIS SUBROUTINE PUTS A DRAG ON THE WINDS ON THE TOP LAYER OF      7003.
 C**** THE ATMOSPHERE                                                    7004.
     """
+
 
 def FILTER():
     """
@@ -494,6 +574,7 @@ C****        2  SMOOTH T USING TROPOSPHERIC STRATIFICATION OF TEMPER    7507.
 C****        3  SMOOTH P AND T                                          7508.
     """
 
+
 def SHAP1D(NORDER):
     """
 C**** THIS SUBROUTINE SMOOTHES THE ARRAY X IN THE ZONAL DIRECTION       7803.
@@ -501,11 +582,13 @@ C**** USING AN N-TH ORDER SHAPIRO FILTER.  N MUST BE EVEN.              7804.
 C**** (USES ONLY IM,JM,JM-1,IM, AND JM FROM COMMON BLOCK)               7804.1
     """
 
+
 def DAILY():
     """
 C**** THIS SUBROUTINE PERFORMS THOSE FUNCTIONS OF THE PROGRAM WHICH     8003.
 C**** TAKE PLACE AT THE BEGINNING OF A NEW DAY.                         8004.
     """
+
 
 def CHECKT(N):
     """
@@ -516,14 +599,27 @@ C**** THE ERRORS ARE CORRECTED.                                         9006.
     """
 
 
+def EXPBYK(X):
+    return X ** .286
 
 
+def THBAR(X, Y):
+    """
+c  **
+c  ** TH-mean used for vertical differencing (Arakawa)
+c  ** THBAR(T1,T2) = (ln(T1) - ln(T2))/(1/T2 - 1/T1)
+c  **              = T1*g(x) with x=T1/T2 , g(x)=ln(x)/(x-1)
+c  **      g(x) is replaced by a rational function
+c  **           (a+bx+cxx+dxxx+cx**4)/(e+fx+gxx)
+c  **      approx.error <1.E-6 for x between .9 and 1.7
+c  **
+    """
 
+    # we live in the 21st century, we can just do the damn math
+    def g(x):
+        return np.log(x) / (x - 1)
 
-
-
-
-
+    return X * g(X/Y)
 
 
 

@@ -53,6 +53,13 @@ RADIUS = 6375000.
 GRAV = 9.81
 RGAS = 287.
 KAPA = 0.286
+OMEGA = 0
+
+PTOP = 10.
+
+SIG = np.zeros((36,))
+SIGE = np.zeros((37,))
+RDM2 = np.zeros((44,))
 
 """
       COMMON /GEOMCB/ RAPVS(JM),RAPVN(JM),RAVPS(JM),RAVPN(JM),F(JM),
@@ -77,6 +84,13 @@ DXYN = np.zeros((JM,))
 COSP = np.zeros((JM,))
 COSV = np.zeros((JM,))
 lat_dg = np.zeros((JM, 2))
+
+"""
+      COMMON /BNDYCB/ FDATA(IM,JM,3),ODATA(IM,JM,5),GDATA(IM,JM,14),
+     *  BLDATA(IM,JM,8),VDATA(IM,JM,10),
+     *  Z1O(IM,JM),Z12O(IM,JM)
+"""
+FDATA = np.zeros((IM, JM, 3))
 
 """
       COMMON /LAYACB/ DSIG(37),DSIGO(36)

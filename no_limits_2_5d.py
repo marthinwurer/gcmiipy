@@ -169,17 +169,32 @@ def pgf(p, t, geom):
     tt = temperature.to_true_temp(t, tp)
     rho = tp / (constants.Rd * tt)
 
-    dphi_ds = p / rho * geom.dsig
-    phi = np.cumsum(dphi_ds, 0) + geom.heightmap * constants.G
-    phiu = iph(p) * gradi(phi, geom.dx_j)
-    phiv = jph(p) * gradj(phi, geom.dy)
+    # dphi_ds = p / rho * geom.dsig
+    # phi = np.cumsum(dphi_ds, 0) + geom.heightmap * constants.G
+    # phiu = iph(p) * gradi(phi, geom.dx_j)
+    # phiv = jph(p) * gradj(phi, geom.dy)
 
     # print(phi[:, 2, 3])
 
     sp = geom.sig * p
 
+    spa = sp / rho
+    s1 = spa * geom.dsig
+    # this is the first phi in the original pgf
+    pkdn = ((geom.sig * p + geom.ptop) / constants.P0) ** constants.kappa
+    pkup = kp(pkdn)
+    # for l+1
+    stp = constants.Cp * kph(t) * (pkdn - pkup)
+    s2 = geom.sigt * stp
+    stp_n = km(stp)
+    stp_n[0] = np.sum(s1 - s2, 0) + geom.heightmap * constants.G
+    phi_theirs = np.cumsum(stp_n, 0)
+    phiu = iph(p) * gradi(phi_theirs, geom.dx_j)
+    phiv = jph(p) * gradj(phi_theirs, geom.dy)
+
     ppih = iph(sp)
     rhou = iph(rho)
+    # this part is basically SPA
     pgfu = ppih / rhou * gradi(p, geom.dx_j)
 
     ppjh = jph(sp)
@@ -220,10 +235,10 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
     dus = advec_sig(iph(sd), su, geom)
     dvs = advec_sig(jph(sd), sv, geom)
 
-    pgu = low_pass.arakawa_1977(pgu, geom)
-    phiu = low_pass.arakawa_1977(phiu, geom)
+    pgu = low_pass.arakawa_1977(pgu + phiu, geom)
+    # phiu = low_pass.arakawa_1977(phiu, geom)
 
-    pu_n = pu - (dut + dus + phiu + pgu) * dt
+    pu_n = pu - (dut + dus + pgu) * dt
     pv_n = pv - (dvt + dvs + phiv + pgv) * dt
     # pu_n = pu - (dut + pgu + dus) * dt
     # pv_n = pv - (dvt + pgv + dvs) * dt
