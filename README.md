@@ -215,4 +215,7 @@ Make sure to use the conservation form of the equations with p in the derivative
 
 
 
+More good notes
+https://rams.atmos.colostate.edu/at540/fall03/fall03Pt7.pdf
+
 

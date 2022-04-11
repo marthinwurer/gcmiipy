@@ -1,11 +1,13 @@
 """
-Discretizing on a 1d staggered grid with no flux limiting - just FTCS and matsuno on a C grid
+Discretizing on a 2.5d staggered grid with no flux limiting - just FTCS and matsuno on a C grid
 
 grid is:
    i h ip
 j  P U P
 h  V   V
 jp P U P
+
+k is the vertical component
 """
 import math
 import unittest
@@ -16,7 +18,7 @@ import matplotlib.pyplot as plt
 
 import constants
 import low_pass
-from coordinates import *
+from coordinates_3d import *
 from constants import *
 import temperature
 
@@ -39,6 +41,56 @@ def un_pu(pu, p):
 def un_pv(pv, p):
     v = pv / jph(p)
     return v
+
+
+def aflux(pu, pv, geom):
+    """
+    compute pit (dp), conv, and sigma_dot
+    """
+    """
+    So, the convergence seems to be u * surface pressure * dsig, which is interesting.
+    I was thinking they'd be each layer * sigma and then integrated over that layer?
+    So, what would that actually be, then? 
+    the actual pressure is sig * p + ptop
+    then that gets fed into rho for the pgf term
+    well, isn't that that? dsig is the amount of pressure on that level, 
+    so yeah, that would work.
+    so then sigma dot is the diffence between what
+    sigma would be for that level vs what it should be
+    ok yeah, dsig * p is the amount of pressure for that level, and then that gets advected
+    according to the velocity for that level
+    That means that my layers are actually a bit thinner,
+    so I might be able to take longer time steps.
+    so, we have p which is at sig = 1
+    then conv which is the change in pressure for each layer
+    then pit which is the sum.
+    """
+    conv = ((pu - imj(pu)) / geom.dx_j + (pv - ijm(pv)) / geom.dy) * geom.dsig
+    pit = np.sum(conv, 0)
+
+    # sd1 = conv - geom.dsig * pit
+    """
+    Ok, so we get the change in pressure at each layer, right? That's conv
+    we also get the change in surface pressure, that's pit
+    Ah, so we do have to sum up the changes in the lower levels to get our 
+    actual change at sigma.
+    I think I need to work out a few layers out by hand
+    
+    
+    """
+    sd = np.cumsum(conv[::-1], 0)[::-1] - pit * geom.sigb
+    # apply boundary condition to sd
+    sd[0] = 0 * sd.u
+
+    return (pit, sd)
+
+
+def advec_sig(sd, q, geom):
+    flux = kmh(q) * sd
+    dq = (flux - kp(flux)) / geom.dsig
+    return dq
+
+
 
 
 def advec_p(pu, pv, geom):
@@ -111,17 +163,26 @@ def advec_m_pu(p, u, v, pu, pv, geom):
 
 
 def pgf(p, t, geom):
-    ppih = iph(p)
-    ttu = temperature.to_true_temp(iph(t), ppih)
-    rhou = ppih / (constants.Rd * ttu)
 
-    pgfu = ppih / rhou * gradi(p, geom.dx_j)
 
-    ppjh = jph(p)
-    ttv = temperature.to_true_temp(jph(t), ppjh)
-    rhov = ppjh / (constants.Rd * ttv)
+    tp = p * geom.dsig + geom.ptop
+    tt = temperature.to_true_temp(t, tp)
+    rho = tp / (constants.Rd * tt)
 
-    pgfv = ppjh / rhov * gradj(p, geom.dy)
+    dphi_ds = p / rho * geom.dsig
+    phi = np.cumsum(dphi_ds, 0) + geom.heightmap * constants.G
+
+    print(phi[:, 2, 3])
+
+    sp = geom.sig * p
+
+    ppih = iph(sp)
+    rhou = iph(rho)
+    pgfu = ppih / rhou * gradi(p, geom.dx_j) + ppih * gradi(phi, geom.dx_j)
+
+    ppjh = jph(sp)
+    rhov = jph(rho)
+    pgfv = ppjh / rhov * gradj(p, geom.dy) + ppjh * gradj(phi, geom.dy)
 
     return pgfu, pgfv
 
@@ -148,23 +209,26 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
     pv = calc_pv(p, v)
     spv = calc_pv(sp, sv)
 
-    p_n = p - advec_p(spu, spv, geom) * dt
+    pit, sd = aflux(spu, spv, geom)
+    p_n = p - pit * dt
 
     # dut, dvt = advec_m(sp, su, sv, geom)
     dut, dvt = advec_m_pu(sp, su, sv, spu, spv, geom)
     pgu, pgv = pgf(sp, st, geom)
+    dus = advec_sig(iph(sd), su, geom)
+    dvs = advec_sig(jph(sd), sv, geom)
 
     pgu = low_pass.arakawa_1977(pgu, geom)
 
-    pu_n = pu - (dut + pgu) * dt
-    pv_n = pv - (dvt + pgv) * dt
+    pu_n = pu - (dut + pgu + dus) * dt
+    pv_n = pv - (dvt + pgv + dvs) * dt
 
     u_n = un_pu(pu_n, p_n)
     v_n = un_pv(pv_n, p_n)
 
-    t_n = t - (advec_t(spu, spv, st, geom) / p_n) * dt
+    t_n = (t * p - (advec_t(spu, spv, st, geom) + advec_sig(sd, st, geom)) * dt) / p_n
 
-    v_n[-1, :] *= 0
+    v_n[:, -1, :] *= 0
     # u_n[:, -1] *= 0
 
     return (p_n, u_n, v_n, t_n, q)
@@ -186,13 +250,17 @@ layers = 9
 
 class Geom:
     def __init__(self):
-        self.sigma_edges = []
+        self.sige = []
         self.dsig = []
+        self.sigb = []
+        self.sigt = []
         # self.dx = 0
         self.dy = 0
         self.lat = []
         self.dx_j = 0
         self.dx_h = 0
+        self.ptop = 0
+        self.heightmap = []
 
 
 def gen_geometry(height, width, layers):
@@ -201,7 +269,7 @@ def gen_geometry(height, width, layers):
       DATA SIGE/    1.,.948665,.866530,.728953,.554415,.390144,
      *  .251540,.143737,.061602,28*0./                        
     """
-    sige = [1., .948665, .866530, .728953, .554415, .390144, .251540, .143737, .061602, 0.]
+    sige = np.asarray([1., .948665, .866530, .728953, .554415, .390144, .251540, .143737, .061602, 0.])
 
     """
 C**** CALCULATE DSIG AND DSIGO                                           816.   
@@ -224,9 +292,24 @@ C**** CALCULATE DSIG AND DSIGO                                           816.
                 0.
     ]
 
+
+
+    geom = Geom()
     mysig = []
     for i in range(layers+1):
         mysig.append(1 - i/(layers))
+
+    def rs(arr):
+        return np.reshape(arr, (arr.shape[0], 1, 1))
+
+    geom.sige = rs(np.asarray(mysig))
+    geom.sigt = rs(np.asarray(mysig[1:]))
+    geom.sigb = rs(np.asarray(mysig[:-1]))
+
+    geom.dsig = geom.sigb - geom.sigt
+    geom.sig = (geom.sigb + geom.sigt) / 2
+    geom.dsigv = kp(geom.sig) - geom.sig
+    # TODO I might need another dsig for inbetween layers for vertical advection
 
     circumference = 2 * radius * math.pi
     lat_j = np.zeros((height,))
@@ -265,13 +348,15 @@ C**** CALCULATE DSIG AND DSIGO                                           816.
     # plt.plot(mysig)
     # plt.show()
 
-    geom = Geom()
-    geom.sigma_edges = mysig
     # TODO spherical geometry
     # geom.dx = circumference / width
-    geom.dx_j = np.reshape(dx_j, (height, 1))
-    geom.dx_h = np.reshape(dx_h, (height, 1))
+    geom.dx_j = np.reshape(dx_j, (1, height, 1))
+    geom.dx_h = np.reshape(dx_h, (1, height, 1))
     geom.dy = circumference / 2 / height
+
+    geom.ptop = 10 * units.hPa
+
+    geom.heightmap = np.zeros((height, width)) * units.m
 
     return geom
 
@@ -291,27 +376,24 @@ def plot_callback(q):
 class TestBasicDiscretizaion(unittest.TestCase):
     def test_timestep_u_changes(self):
         geom = gen_geometry(height, width, layers)
-        # p = np.full((height, width, layers), 1) * standard_pressure
-        # u = np.full((height, width, layers), 1) * 1.0 * units.m / units.s
-        # v = np.full((height, width, layers), 1) * .0 * units.m / units.s
-        # q = np.full((height, width, layers), 1) * 0.1 * units.dimensionless
-        # t = np.full((height, width, layers), 1) * temperature.to_potential_temp(standard_temperature, p)
-        p = np.full((height, width), 1) * standard_pressure
-        u = np.full((height, width), 1) * 1.0 * units.m / units.s
-        v = np.full((height, width), 1) * .0 * units.m / units.s
-        q = np.full((height, width), 1) * 0.1 * units.dimensionless
-        t = np.full((height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
+        p = np.full((height, width), 1) * standard_pressure - geom.ptop
+        u = np.full((layers, height, width), 1) * 1.0 * units.m / units.s
+        v = np.full((layers, height, width), 1) * .0 * units.m / units.s
+        q = np.full((layers, height, width), 1) * 0.1 * units.dimensionless
+        t = np.full((layers, height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
         dx = 100 * units.m
         dt = 60 * 15 * units.s
 
         # p[10, 10, 0] *= 1.01
         # u[0, 3, 0] *= 200
         # t[3, 3, 0] *= 1.1
-        p[10, 10] *= 1.01
-        u[:, 12] *= 2
-        u[1, 3] *= 2
-        v[18, 18] = 1 * units.m / units.s
-        t[3, 3] *= 1.1
+        # p[10, 10] *= 1.01
+        # u[0, :, 12] *= 2
+        u[0, 0, 3] *= 2
+        # v[0, 18, 18] = 1 * units.m / units.s
+        # t[0, 3, 3] *= 1.1
+
+        # geom.heightmap[2, 3] = 2 * units.m
         # u[3] *= 2
         # ok, CFL for this is sqrt(2)/4
 
@@ -334,8 +416,8 @@ class TestBasicDiscretizaion(unittest.TestCase):
             p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
 
             # plot_callback(temperature.to_true_temp(t, p).m)
+            # plot_callback(u.m[0, :, :])
             plot_callback(p.m[:, :])
-            # plot_callback(p.m[:, :, 0])
             if np.isnan(u).any() != False:
                 break
 

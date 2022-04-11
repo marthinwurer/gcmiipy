@@ -49,7 +49,7 @@ def arakawa_1977(q, geom):
     averaging operator.
     """
     # (jm, im, lm) = q.shape
-    (jm, im) = q.shape
+    (lm, jm, im) = q.shape
     drat = geom.dy / geom.dx_j
 
 
@@ -61,7 +61,7 @@ def arakawa_1977(q, geom):
 
     sm = 1 - bysn / drat
     smmz = 1 - np.maximum(sm, np.zeros_like(sm))
-    smmz = np.insert(smmz, 0, 1, 1)
+    smmz = np.insert(smmz, 0, 1, -1)
 
 
     f_q = np.fft.rfft(q.m)
