@@ -165,26 +165,28 @@ def advec_m_pu(p, u, v, pu, pv, geom):
 def pgf(p, t, geom):
 
 
-    tp = p * geom.dsig + geom.ptop
+    tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
     rho = tp / (constants.Rd * tt)
 
     dphi_ds = p / rho * geom.dsig
     phi = np.cumsum(dphi_ds, 0) + geom.heightmap * constants.G
+    phiu = iph(p) * gradi(phi, geom.dx_j)
+    phiv = jph(p) * gradj(phi, geom.dy)
 
-    print(phi[:, 2, 3])
+    # print(phi[:, 2, 3])
 
     sp = geom.sig * p
 
     ppih = iph(sp)
     rhou = iph(rho)
-    pgfu = ppih / rhou * gradi(p, geom.dx_j) + ppih * gradi(phi, geom.dx_j)
+    pgfu = ppih / rhou * gradi(p, geom.dx_j)
 
     ppjh = jph(sp)
     rhov = jph(rho)
-    pgfv = ppjh / rhov * gradj(p, geom.dy) + ppjh * gradj(phi, geom.dy)
+    pgfv = ppjh / rhov * gradj(p, geom.dy)
 
-    return pgfu, pgfv
+    return pgfu, pgfv, phiu, phiv
 
 
 def advec_t(pu, pv, t, geom):
@@ -214,14 +216,17 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
 
     # dut, dvt = advec_m(sp, su, sv, geom)
     dut, dvt = advec_m_pu(sp, su, sv, spu, spv, geom)
-    pgu, pgv = pgf(sp, st, geom)
+    pgu, pgv, phiu, phiv = pgf(sp, st, geom)
     dus = advec_sig(iph(sd), su, geom)
     dvs = advec_sig(jph(sd), sv, geom)
 
     pgu = low_pass.arakawa_1977(pgu, geom)
+    phiu = low_pass.arakawa_1977(phiu, geom)
 
-    pu_n = pu - (dut + pgu + dus) * dt
-    pv_n = pv - (dvt + pgv + dvs) * dt
+    pu_n = pu - (dut + dus + phiu + pgu) * dt
+    pv_n = pv - (dvt + dvs + phiv + pgv) * dt
+    # pu_n = pu - (dut + pgu + dus) * dt
+    # pv_n = pv - (dvt + pgv + dvs) * dt
 
     u_n = un_pu(pu_n, p_n)
     v_n = un_pv(pv_n, p_n)
@@ -389,7 +394,7 @@ class TestBasicDiscretizaion(unittest.TestCase):
         # t[3, 3, 0] *= 1.1
         # p[10, 10] *= 1.01
         # u[0, :, 12] *= 2
-        u[0, 0, 3] *= 2
+        u[:, 0, 3] *= 2
         # v[0, 18, 18] = 1 * units.m / units.s
         # t[0, 3, 3] *= 1.1
 
