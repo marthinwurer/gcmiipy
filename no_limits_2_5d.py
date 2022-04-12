@@ -88,7 +88,7 @@ def aflux(pu, pv, geom):
 def advec_sig(sd, q, geom):
     flux = kmh(q) * sd
     dq = (flux - kp(flux)) / geom.dsig
-    return dq
+    return -dq
 
 
 
@@ -235,10 +235,10 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
     dus = advec_sig(iph(sd), su, geom)
     dvs = advec_sig(jph(sd), sv, geom)
 
-    pgu = low_pass.arakawa_1977(pgu + phiu, geom)
+    pgfu = low_pass.arakawa_1977(pgu + phiu, geom)
     # phiu = low_pass.arakawa_1977(phiu, geom)
 
-    pu_n = pu - (dut + dus + pgu) * dt
+    pu_n = pu - (dut + dus + pgfu) * dt
     pv_n = pv - (dvt + dvs + phiv + pgv) * dt
     # pu_n = pu - (dut + pgu + dus) * dt
     # pv_n = pv - (dvt + pgv + dvs) * dt
@@ -247,9 +247,12 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
     v_n = un_pv(pv_n, p_n)
 
     t_n = (t * p - (advec_t(spu, spv, st, geom) + advec_sig(sd, st, geom)) * dt) / p_n
+    # t_n = t - (advec_t(spu, spv, st, geom) + advec_sig(sd, st, geom)) * dt / p_n
 
     v_n[:, -1, :] *= 0
     # u_n[:, -1] *= 0
+    print()
+    print(p[0, 3], p_n[0, 3], pgfu[0, 0, 3], dus[0, 0, 3])
 
     return (p_n, u_n, v_n, t_n, q)
 
@@ -266,6 +269,7 @@ def matsuno_timestep(p, u, v, t, q, dt, geom):
 height = 24
 width = 36
 layers = 9
+# layers = 3
 
 
 class Geom:
@@ -374,7 +378,8 @@ C**** CALCULATE DSIG AND DSIGO                                           816.
     geom.dx_h = np.reshape(dx_h, (1, height, 1))
     geom.dy = circumference / 2 / height
 
-    geom.ptop = 10 * units.hPa
+    # geom.ptop = 10 * units.hPa
+    geom.ptop = 0 * units.hPa
 
     geom.heightmap = np.zeros((height, width)) * units.m
 
@@ -406,10 +411,11 @@ class TestBasicDiscretizaion(unittest.TestCase):
 
         # p[10, 10, 0] *= 1.01
         # u[0, 3, 0] *= 200
-        # t[3, 3, 0] *= 1.1
-        # p[10, 10] *= 1.01
-        # u[0, :, 12] *= 2
-        u[:, 0, 3] *= 2
+        # t[0, 3, 0] *= 1.0001
+        p[10, 10] *= 1.01
+        u[0, :, 12] *= 2
+        # u[:, 0, 3] *= 2
+        u[0, 0, 3] *= 2
         # v[0, 18, 18] = 1 * units.m / units.s
         # t[0, 3, 3] *= 1.1
 
@@ -436,7 +442,7 @@ class TestBasicDiscretizaion(unittest.TestCase):
             p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
 
             # plot_callback(temperature.to_true_temp(t, p).m)
-            # plot_callback(u.m[0, :, :])
+            # plot_callback((t[0]).m[ :, :])
             plot_callback(p.m[:, :])
             if np.isnan(u).any() != False:
                 break

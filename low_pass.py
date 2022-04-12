@@ -49,7 +49,11 @@ def arakawa_1977(q, geom):
     averaging operator.
     """
     # (jm, im, lm) = q.shape
-    (lm, jm, im) = q.shape
+    if len(q.shape) > 2:
+        (lm, jm, im) = q.shape
+    else:
+        (jm, im) = q.shape
+
     drat = geom.dy / geom.dx_j
 
 
