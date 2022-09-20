@@ -251,8 +251,8 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
 
     v_n[:, -1, :] *= 0
     # u_n[:, -1] *= 0
-    print()
-    print(p[0, 3], p_n[0, 3], pgfu[0, 0, 3], dus[0, 0, 3])
+    # print()
+    # print(p[0, 3], p_n[0, 3], pgfu[0, 0, 3], dus[0, 0, 3])
 
     return (p_n, u_n, v_n, t_n, q)
 
@@ -449,3 +449,29 @@ class TestBasicDiscretizaion(unittest.TestCase):
 
         plt.ioff()
         plt.show()
+
+
+def run_model(height, width, layers, dt, timesteps, callback):
+    geom = gen_geometry(height, width, layers)
+    p = np.full((height, width), 1) * standard_pressure - geom.ptop
+    u = np.full((layers, height, width), 1) * 1.0 * units.m / units.s
+    v = np.full((layers, height, width), 1) * .0 * units.m / units.s
+    q = np.full((layers, height, width), 1) * 0.1 * units.dimensionless
+    t = np.full((layers, height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
+
+    p[0, 0] *= 1.01
+
+    for i in tqdm(range(timesteps)):
+        p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+        if callback:
+            callback(p, u, v, t, q)
+
+
+def main():
+    # run_model(height, width, layers, 60 * 15 * units.s, 1000, None)
+    run_model(1, 1, 18, 60 * 15 * units.s, 1000, None)
+
+
+if __name__ == "__main__":
+    main()
+
