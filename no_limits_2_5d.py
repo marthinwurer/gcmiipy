@@ -214,6 +214,12 @@ def advec_t(pu, pv, t, geom):
     return dt
 
 
+def solar(p, q, t, c, utc, geom):
+    # do basic solar radiation, starting from the top of the atmosphere.
+
+    # split between the cloudy and clear parts.
+
+
 
 
 def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
