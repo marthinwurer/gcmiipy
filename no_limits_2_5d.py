@@ -162,19 +162,11 @@ def advec_m_pu(p, u, v, pu, pv, geom):
     return (dut, dvt)
 
 
-def pgf(p, t, geom):
-
-
+def compute_geopotential(p, t, geom):
+    # True pressure, true temperature, and density
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
     rho = tp / (constants.Rd * tt)
-
-    # dphi_ds = p / rho * geom.dsig
-    # phi = np.cumsum(dphi_ds, 0) + geom.heightmap * constants.G
-    # phiu = iph(p) * gradi(phi, geom.dx_j)
-    # phiv = jph(p) * gradj(phi, geom.dy)
-
-    # print(phi[:, 2, 3])
 
     sp = geom.sig * p
 
@@ -188,7 +180,26 @@ def pgf(p, t, geom):
     s2 = geom.sigt * stp
     stp_n = km(stp)
     stp_n[0] = np.sum(s1 - s2, 0) + geom.heightmap * constants.G
+
+    # this is the geopotential of each layer
     phi_theirs = np.cumsum(stp_n, 0)
+
+    return phi_theirs
+
+
+
+def pgf(p, t, geom):
+
+    # True pressure, true temperature, and density
+    tp = p * geom.sig + geom.ptop
+    tt = temperature.to_true_temp(t, tp)
+    rho = tp / (constants.Rd * tt)
+
+    sp = geom.sig * p
+
+    phi_theirs = compute_geopotential(p, t, geom)
+
+    # phi at U and V
     phiu = iph(p) * gradi(phi_theirs, geom.dx_j)
     phiv = jph(p) * gradj(phi_theirs, geom.dy)
 
@@ -214,10 +225,31 @@ def advec_t(pu, pv, t, geom):
     return dt
 
 
+def AzG(angle, top, bottom, urg, asg):
+    """
+    based off of formula 25 in manabe 64
+    """
+
+    return asg * (np.arccos(angle) * urg(top))
+
+
 def solar(p, q, t, c, utc, geom):
     # do basic solar radiation, starting from the top of the atmosphere.
+    # need more solar stuff
 
     # split between the cloudy and clear parts.
+
+    # zenith_angle = 
+
+    starting_flux = solar_constant * cos(zenith_angle)
+
+    # pressure_depth = 
+
+    # ok, so I need to be able to get optical depth from something.
+    # I think we need to somehow get from whatever we have to cm/km
+    # do we just have to mulitply that geopotential difference by the density?
+
+
 
 
 
@@ -242,6 +274,7 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
     dvs = advec_sig(jph(sd), sv, geom)
 
     pgfu = low_pass.arakawa_1977(pgu + phiu, geom)
+    assert pgu.shape == pgfu.shape
     # phiu = low_pass.arakawa_1977(phiu, geom)
 
     pu_n = pu - (dut + dus + pgfu) * dt
@@ -326,8 +359,12 @@ C**** CALCULATE DSIG AND DSIGO                                           816.
 
     geom = Geom()
     mysig = []
+
+    def manabe_sig(s):
+        return s ** 2 * (3 - 2 * s)
+
     for i in range(layers+1):
-        mysig.append(1 - i/(layers))
+        mysig.append(manabe_sig(1 - i/(layers)))
 
     def rs(arr):
         return np.reshape(arr, (arr.shape[0], 1, 1))
@@ -463,7 +500,9 @@ def run_model(height, width, layers, dt, timesteps, callback):
     u = np.full((layers, height, width), 1) * 1.0 * units.m / units.s
     v = np.full((layers, height, width), 1) * .0 * units.m / units.s
     q = np.full((layers, height, width), 1) * 0.1 * units.dimensionless
-    t = np.full((layers, height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
+    tt = np.full((layers, height, width), 1) * standard_temperature
+    t = temperature.to_potential_temp(tt, p * geom.sig + geom.ptop)
+    # t = np.full((layers, height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
 
     p[0, 0] *= 1.01
 
@@ -473,9 +512,13 @@ def run_model(height, width, layers, dt, timesteps, callback):
             callback(p, u, v, t, q)
 
 
+def test_absorbtion_units():
+    dp = 10 * units.hPa
+
+
 def main():
     # run_model(height, width, layers, 60 * 15 * units.s, 1000, None)
-    run_model(1, 1, 18, 60 * 15 * units.s, 1000, None)
+    run_model(1, 1, 18, 60 * 15 * units.s, 1, None)
 
 
 if __name__ == "__main__":

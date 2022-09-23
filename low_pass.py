@@ -54,6 +54,10 @@ def arakawa_1977(q, geom):
     else:
         (jm, im) = q.shape
 
+    # TODO make sure this works for odd grids
+    if im == 1:
+        return q
+
     drat = geom.dy / geom.dx_j
 
 

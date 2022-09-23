@@ -52,6 +52,18 @@ x_dim = -1
 y_dim = -2
 z_dim = -3
 
+# solar constant
+solar_constant = 1.3608 * units.kW * units.m ** -2
+
+# ozone molar mass
+M_ozone = 48.00 * units.g * units.mol ** -1
+
+# water molar mass
+M_water = 18.016 * units.g * units.mol ** -1
+
+# CO2 molar mass
+M_CO2 = 44.010 * units.g * units.mol ** -1
+
 
 """
 Functions for using units with numpy helper functions
