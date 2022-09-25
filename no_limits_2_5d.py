@@ -249,6 +249,24 @@ def solar(p, q, t, c, utc, geom):
     # I think we need to somehow get from whatever we have to cm/km
     # do we just have to mulitply that geopotential difference by the density?
 
+    # do optical path from formula 44 of 
+    # https://webspace.science.uu.nl/~delde102/AtmosphericDynamics%5b2020a%5dCh2.pdf
+
+    # eventually take 4 band model from section 2.17 of that paper.
+
+
+
+    tp = p * geom.sig + geom.ptop
+    tt = temperature.to_true_temp(t, tp)
+    rho = tp / (constants.Rd * tt)
+
+    dp = p * geom.dsig
+
+    # page 51
+    sig_a = 0.125 * units.m ** 2 / units.kg
+
+    optical_path = sig_a * rho_a / (G * rho) * dp
+
 
 
 
