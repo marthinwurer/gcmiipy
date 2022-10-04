@@ -49,6 +49,7 @@ def grey_solar(p, q, t, c, gt, utc, geom:Geom):
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
     rho = tp / (constants.Rd * tt)
+    print("rho", rho.to_base_units())
 
     dp = p * geom.dsig
     oc = ozone_at(tp)
@@ -72,19 +73,21 @@ def grey_solar(p, q, t, c, gt, utc, geom:Geom):
     for gas, coefficient in gasses:
         plg = path_length * gas
         print("plg", plg.u)
-        absorbance += gas * path_length * coefficient
+        absorbance += gas * rho * path_length * coefficient
 
     transmittance = 10 ** -absorbance
+    a_cloud = absorbance * 1.66
+    t_cloud = 10 ** -a_cloud
     print("absorbance", absorbance)
     print("transmittance", transmittance)
-    print("tp", tp)
 
     for layer in reversed(range(geom.layers)):
         # take the basic equation from manabe 64 21a
         previous = downwelling[layer + 1]
         trans_layer = transmittance[layer]
+        t_cloud_layer = t_cloud[layer]
         non_cloud = (1 - c) * (previous * trans_layer)
-        cloud = c * 0.5 * (previous * trans_layer * 1.66)
+        cloud = c * 0.5 * (previous * t_cloud_layer)
 
         downwelling[layer] = non_cloud + cloud
 

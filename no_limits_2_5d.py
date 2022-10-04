@@ -308,12 +308,17 @@ def half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom):
     t_n = (t * p - (advec_t(spu, spv, st, geom) + advec_sig(sd, st, geom)) * dt) / p_n
     # t_n = t - (advec_t(spu, spv, st, geom) + advec_sig(sd, st, geom)) * dt / p_n
 
+    # TODO advect water vapor as well
+    # TODO might need to flux limit this
+    q_n = (q * p - (advec_t(spu, spv, sq, geom) + advec_sig(sd, sq, geom)) * dt) / p_n
+
+    # TODO do boundary conditions outside of the timestep
     v_n[:, -1, :] *= 0
     # u_n[:, -1] *= 0
     # print()
     # print(p[0, 3], p_n[0, 3], pgfu[0, 0, 3], dus[0, 0, 3])
 
-    return (p_n, u_n, v_n, t_n, q)
+    return (p_n, u_n, v_n, t_n, q_n)
 
 
 def matsuno_timestep(p, u, v, t, q, dt, geom):
@@ -351,14 +356,24 @@ def plot_callback(q):
     plt.pause(0.001)  # pause a bit so that plots are updated
 
 
+def gen_initial_conditions(geom):
+    full = (geom.layers, geom.height, geom.width)
+    p = np.full((geom.height, geom.width), 1) * standard_pressure - geom.ptop
+    u = np.full(full, 1) * 1.0 * units.m / units.s
+    v = np.full(full, 1) * .0 * units.m / units.s
+    t = temperature.to_potential_temp(
+        np.full(full, 1) * standard_temperature,
+        p * geom.sig + geom.ptop
+    )
+    q = np.full(full, 1) * 0.000003 * units.kg * units.kg ** -1
+
+    return p, u, v, t, q
+
+
 class TestBasicDiscretizaion(unittest.TestCase):
     def test_timestep_u_changes(self):
         geom = gen_geometry(height, width, layers)
-        p = np.full((height, width), 1) * standard_pressure - geom.ptop
-        u = np.full((layers, height, width), 1) * 1.0 * units.m / units.s
-        v = np.full((layers, height, width), 1) * .0 * units.m / units.s
-        q = np.full((layers, height, width), 1) * 0.1 * units.dimensionless
-        t = np.full((layers, height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
+        p, u, v, t, q = gen_initial_conditions(geom)
         dx = 100 * units.m
         dt = 60 * 15 * units.s
 
@@ -406,13 +421,7 @@ class TestBasicDiscretizaion(unittest.TestCase):
 
 def run_model(height, width, layers, dt, timesteps, callback):
     geom = gen_geometry(height, width, layers)
-    p = np.full((height, width), 1) * standard_pressure - geom.ptop
-    u = np.full((layers, height, width), 1) * 1.0 * units.m / units.s
-    v = np.full((layers, height, width), 1) * .0 * units.m / units.s
-    q = np.full((layers, height, width), 1) * 0.1 * units.g * units.m ** -3
-    tt = np.full((layers, height, width), 1) * standard_temperature
-    t = temperature.to_potential_temp(tt, p * geom.sig + geom.ptop)
-    # t = np.full((layers, height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
+    p, u, v, t, q = gen_initial_conditions(geom)
 
     p[0, 0] *= 1.01
 
