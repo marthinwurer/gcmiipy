@@ -22,6 +22,7 @@ from coordinates_3d import *
 from constants import *
 import temperature
 from geometry import *
+from grey_solar import grey_solar
 
 
 def calc_pu(p, u):
@@ -320,6 +321,13 @@ def matsuno_timestep(p, u, v, t, q, dt, geom):
     return half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom)
 
 
+def full_timestep(p, u, v, t, q, dt, geom):
+    p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+    grey_solar(p, q, t, 0.3, None, None, geom)
+    return p, u, v, t, q 
+
+
+
 
 
 
@@ -401,7 +409,7 @@ def run_model(height, width, layers, dt, timesteps, callback):
     p = np.full((height, width), 1) * standard_pressure - geom.ptop
     u = np.full((layers, height, width), 1) * 1.0 * units.m / units.s
     v = np.full((layers, height, width), 1) * .0 * units.m / units.s
-    q = np.full((layers, height, width), 1) * 0.1 * units.dimensionless
+    q = np.full((layers, height, width), 1) * 0.1 * units.g * units.m ** -3
     tt = np.full((layers, height, width), 1) * standard_temperature
     t = temperature.to_potential_temp(tt, p * geom.sig + geom.ptop)
     # t = np.full((layers, height, width), 1) * temperature.to_potential_temp(standard_temperature, p)
@@ -409,7 +417,7 @@ def run_model(height, width, layers, dt, timesteps, callback):
     p[0, 0] *= 1.01
 
     for i in tqdm(range(timesteps)):
-        p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+        p, u, v, t, q = full_timestep(p, u, v, t, q, dt, geom)
         if callback:
             callback(p, u, v, t, q)
 
