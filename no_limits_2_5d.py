@@ -22,7 +22,7 @@ from coordinates_3d import *
 from constants import *
 import temperature
 from geometry import *
-from grey_solar import grey_solar
+from grey_solar import grey_solar, grey_radiation
 
 
 def calc_pu(p, u):
@@ -328,8 +328,9 @@ def matsuno_timestep(p, u, v, t, q, dt, geom):
 
 def full_timestep(p, u, v, t, q, dt, geom):
     p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
-    grey_solar(p, q, t, 0.3, None, None, geom)
-    return p, u, v, t, q 
+    # t_n, downwelling = grey_solar(p, q, t, 0.25, None, None, dt, geom)
+    grey_radiation(p, q, t, 0.25, None, None, dt, geom)
+    return p, u, v, t_n, q 
 
 
 

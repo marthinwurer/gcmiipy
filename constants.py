@@ -64,6 +64,9 @@ M_water = 18.016 * units.g * units.mol ** -1
 # CO2 molar mass
 M_CO2 = 44.010 * units.g * units.mol ** -1
 
+# Stefan-Boltzmann constant
+sb_constant = 5.67e-8 * units.W * units.m ** -2 * units.K ** -4
+
 
 """
 Functions for using units with numpy helper functions

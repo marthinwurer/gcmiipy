@@ -18,6 +18,7 @@ class Geom:
         # self.dx = 0
         self.dy = 0
         self.lat = []
+        self.long = []
         self.dx_j = 0
         self.dx_h = 0
         self.ptop = 0
@@ -89,6 +90,14 @@ C**** CALCULATE DSIG AND DSIGO                                           816.
     for i in range(height):
         lat_j[i] = 90 - (i+0.5) * dlat
         lat_h[i] = 90 - (i+1) * dlat
+
+    long_k = np.zeros((width,))
+    for i in range(width):
+        long_k[i] = -180 + (i+0.5) * dlong
+
+
+    geom.lat = lat_j
+    geom.long = long_k
 
     cos_j = np.cos(lat_j * np.pi / 180)
     sin_j = np.sin(lat_j * np.pi / 180)

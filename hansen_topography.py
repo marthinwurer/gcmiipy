@@ -1,10 +1,12 @@
-
-
-
-
 """
 Take the maps from 611 in hansen 1983 and use them as a baseline
 """
+import numpy as np
+
+from constants import units
+
+height = 24
+width = 36
 
 land_cover_map = \
 """
@@ -73,3 +75,28 @@ topography_map = \
 00002675467960004BLTTSUUNITXWUTRPME2
 543347BEIKHA7778FMRVXYZZY+++YWUSPNG8
 RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"""
+
+
+def calc_topography():
+    output = np.zeros((height, width))
+    lines = topography_map.splitlines()
+    for i, line in enumerate(lines):
+        for j, char in enumerate(line):
+            if char == '0':
+                val = 25
+            elif char == '+':
+                val = 4500
+            elif char == ' ':
+                val = 0
+            elif ord(char) < ord('A'):
+                val = 100 * (ord(char) - ord('0'))
+            else:
+                val = 100 * (ord(char) - ord('A')) + 1000
+            output[i, j] = val
+    return output * units.m
+
+
+if __name__ == "__main__":
+    print(calc_topography())
+
+
