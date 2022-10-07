@@ -11,6 +11,7 @@ k is the vertical component
 """
 import math
 import unittest
+from collections import namedtuple
 
 import numpy as np
 from tqdm import tqdm
@@ -326,11 +327,20 @@ def matsuno_timestep(p, u, v, t, q, dt, geom):
     return half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom)
 
 
-def full_timestep(p, u, v, t, q, dt, geom):
+def full_timestep(p, u, v, t, q, g, dt, geom):
+    # atmosphere timestep
     p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+
+    # physics timestep
     # t_n, downwelling = grey_solar(p, q, t, 0.25, None, None, dt, geom)
-    grey_radiation(p, q, t, 0.25, None, None, dt, geom)
-    return p, u, v, t_n, q 
+    tp = p * geom.sig + geom.ptop
+    tt = temperature.to_true_temp(t, tp)
+    dt_ground, dt_air, upwelling = grey_radiation(p, q, tt, 0.0, g, None, dt, geom)
+    gt_n = g.gt + dt_ground * dt
+    tt_n = tt + dt_air * dt
+    t_n = temperature.to_potential_temp(tt_n, tp)
+    g_n = GroundVars(gt_n, g.gw, g.snow, g.ice)
+    return p, u, v, t_n, q, g_n
 
 
 
@@ -357,9 +367,14 @@ def plot_callback(q):
     plt.pause(0.001)  # pause a bit so that plots are updated
 
 
+PrognosticVars = namedtuple("PrognosticVars", ("p", "u", "v", "t", "q", "gt", "gw", "sd", "id"))
+GroundVars = namedtuple("GroundVars", ("gt", "gw", "snow", "ice"))
+
+
 def gen_initial_conditions(geom):
     full = (geom.layers, geom.height, geom.width)
-    p = np.full((geom.height, geom.width), 1) * standard_pressure - geom.ptop
+    surface = (geom.height, geom.width)
+    p = np.full(surface, 1) * standard_pressure - geom.ptop
     u = np.full(full, 1) * 1.0 * units.m / units.s
     v = np.full(full, 1) * .0 * units.m / units.s
     t = temperature.to_potential_temp(
@@ -367,14 +382,20 @@ def gen_initial_conditions(geom):
         p * geom.sig + geom.ptop
     )
     q = np.full(full, 1) * 0.000003 * units.kg * units.kg ** -1
+    gt = np.full(surface, 1) * standard_temperature
+    gw = np.zeros(surface) * units.m
+    snow = np.zeros(surface) * units.m
+    ice = np.zeros(surface) * units.m
+    
+    g = GroundVars(gt, gw, snow, ice)
 
-    return p, u, v, t, q
+    return p, u, v, t, q, g
 
 
 class TestBasicDiscretizaion(unittest.TestCase):
     def test_timestep_u_changes(self):
         geom = gen_geometry(height, width, layers)
-        p, u, v, t, q = gen_initial_conditions(geom)
+        p, u, v, t, q, _ = gen_initial_conditions(geom)
         dx = 100 * units.m
         dt = 60 * 15 * units.s
 
@@ -422,14 +443,16 @@ class TestBasicDiscretizaion(unittest.TestCase):
 
 def run_model(height, width, layers, dt, timesteps, callback):
     geom = gen_geometry(height, width, layers)
-    p, u, v, t, q = gen_initial_conditions(geom)
+    p, u, v, t, q, g = gen_initial_conditions(geom)
 
     p[0, 0] *= 1.01
 
     for i in tqdm(range(timesteps)):
-        p, u, v, t, q = full_timestep(p, u, v, t, q, dt, geom)
+        p, u, v, t, q, g = full_timestep(p, u, v, t, q, g, dt, geom)
         if callback:
             callback(p, u, v, t, q)
+
+    return p, u, v, t, q, g, geom
 
 
 
@@ -450,7 +473,12 @@ def test_absorbtion_units():
 
 def main():
     # run_model(height, width, layers, 60 * 15 * units.s, 1000, None)
-    run_model(1, 1, 18, 60 * 15 * units.s, 1, None)
+    # p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 15 * units.s, 3, None)
+    p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 60 * units.s, 300, None)
+    print("ground temp:", g.gt)
+    tp = p * geom.sig + geom.ptop
+    tt = temperature.to_true_temp(t, tp)
+    print("atmosphere temps:", tt)
 
 
 if __name__ == "__main__":

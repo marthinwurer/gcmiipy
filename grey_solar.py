@@ -26,6 +26,9 @@ def mmr_from_vmr(vmr, mmg, mma):
     return vmr * mmg / mma
 
 
+co2_mmr = mmr_from_vmr(300 / 1e6, M_CO2, Md)
+
+
 def solar_zenith_angle(latitude, hour_angle, declination):
     """
     from https://en.wikipedia.org/wiki/Solar_zenith_angle
@@ -50,7 +53,7 @@ Do single SW pass with ozone, clouds, and water, then both LW passes with CO2 an
 # also page 66
 h2o_weight = 0.125 * units.m ** 2 * units.kg ** -1
 liquid_weight = 5.0 * units.m ** 2 * units.kg ** -1
-co2_weight = 0.3 * units.m ** 2 * units.kg ** -1
+co2_weight = 3.0 * units.m ** 2 * units.kg ** -1
 
 ozone_weight = 0.01 * h2o_weight.u
 
@@ -162,10 +165,9 @@ def grey_solar(p, q, t, c, gt, utc, dt, geom:Geom):
 
 
 
-def grey_radiation(p, q, t, c, gt, utc, dt, geom:Geom):
+def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
 
     tp = p * geom.sig + geom.ptop
-    tt = temperature.to_true_temp(t, tp)
     rho = tp / (constants.Rd * tt)
     dp = p * geom.dsig
 
@@ -174,6 +176,7 @@ def grey_radiation(p, q, t, c, gt, utc, dt, geom:Geom):
 
     flux_shape = (geom.layers + 1, geom.height, geom.width)
     thermal_downwelling = np.zeros(flux_shape) * solar_constant.u
+    thermal_upwelling = np.zeros(flux_shape) * solar_constant.u
     solar_downwelling = np.zeros(flux_shape) * solar_constant.u
 
     # hour_angle = 
@@ -188,13 +191,18 @@ def grey_radiation(p, q, t, c, gt, utc, dt, geom:Geom):
         (q, h2o_weight),
     ]
     sw_absorbance = compute_absorbance(sw_gasses, rho, path_length)
+    sw_transmittance = 10 ** -sw_absorbance
+    a_cloud = sw_absorbance * 1.66  # From Manabe 
+    sw_t_cloud = 10 ** -a_cloud
 
     lw_gasses = [
         (q, h2o_weight),
         # TODO CO2 distribution
-        (oc, ozone_weight),
+        (co2_mmr, co2_weight),
     ]
-    lw_absorbance = compute_absorbance(sw_gasses, rho, path_length)
+    lw_absorbance = compute_absorbance(lw_gasses, rho, path_length)
+    co2_absorbance = co2_mmr * rho * path_length * co2_weight
+    print("co2_absorbance", co2_absorbance[0], 1-10**-co2_absorbance[0])
 
     # longwave just has emissivity at the same rate as absorbtion
     # I think for the cloud absorbance we can just convert the cloud thickness
@@ -206,11 +214,91 @@ def grey_radiation(p, q, t, c, gt, utc, dt, geom:Geom):
     lw_cloud_absorbance = cloud_thickness / np.log(10) + lw_absorbance
 
     lw_emissivity = 1 - 10 ** -lw_absorbance
-    lw_cloud_emssivity = 1 - 10 ** -lw_cloud_absorbance
+    lw_cloud_emissivity = 1 - 10 ** -lw_cloud_absorbance
+    print("lw_emissivity", lw_emissivity[0])
 
-    emittance = sb_constant * tt ** 4 * lw_emissivity
-    print("emittance")
-    print(emittance)
+    emittance = sb_constant * tt ** 4 * ((1 - c) * lw_emissivity + c * lw_cloud_emissivity)
+    # print("emittance")
+    # print(emittance)
+    # treat the ground as fully black
+    ground_emittance = sb_constant * g.gt ** 4
+
+    # do the downwelling
+    absorbed = np.zeros(q.shape) * solar_constant.u
+    reflected = np.zeros(p.shape) * solar_constant.u
+    for layer in reversed(range(geom.layers)):
+
+        # Solar Downwelling
+        # take the basic equation from manabe 64 21a
+        previous = solar_downwelling[layer + 1]
+        trans_layer = sw_transmittance[layer]
+        t_cloud_layer = sw_t_cloud[layer]
+        albedo_layer = sw_cloud_albedo[layer]
+        absorbed_nc = (1 - c) * (previous * (1 - trans_layer))
+        sw_reflected = c * albedo_layer * previous
+        absorbed_c = c * (1 - albedo_layer) * previous * (1 - t_cloud_layer)
+
+        total_absorbed = absorbed_nc + absorbed_c
+        transmitted = previous - total_absorbed - sw_reflected
+        reflected += sw_reflected
+
+        solar_downwelling[layer] = transmitted
+        absorbed[layer] += total_absorbed
+
+        # LW downwelling
+        previous = thermal_downwelling[layer + 1]
+
+        cloud_absorbtion = c * previous * lw_cloud_emissivity[layer]
+        clear_absorbtion = (1 - c) * previous * lw_emissivity[layer]
+        total_absorbtion = cloud_absorbtion + clear_absorbtion
+        lw_transmitted = previous - total_absorbtion
+
+        absorbed[layer] += total_absorbtion
+        thermal_downwelling[layer] = lw_transmitted + emittance[layer]
+
+    # print(absorbed)
+    # print(thermal_downwelling + solar_downwelling)
+
+    # do ground stuff
+    ground_albedo = 0.1
+    ground_sw_absorbtion = (1 - ground_albedo) * solar_downwelling[0]
+    ground_lw_absorbtion = thermal_downwelling[0]
+    ground_absorbtion = ground_sw_absorbtion + ground_lw_absorbtion
+
+    thermal_upwelling[0] = ground_emittance
+
+    # do upwelling
+    for layer in range(geom.layers):
+        previous = thermal_upwelling[layer]
+
+        cloud_absorbtion = c * previous * lw_cloud_emissivity[layer]
+        clear_absorbtion = (1 - c) * previous * lw_emissivity[layer]
+        total_absorbtion = cloud_absorbtion + clear_absorbtion
+        lw_transmitted = previous - total_absorbtion
+
+        absorbed[layer] += total_absorbtion
+        thermal_upwelling[layer + 1] = lw_transmitted + emittance[layer]
+    
+    dt_ground = (ground_absorbtion - ground_emittance) / Cg / (.1 * units.m)
+    # print("ground t:", g.gt)
+    # print("ground dt:", dt_ground.to_base_units())
+
+    dt_air = (absorbed - 2 * emittance) / (Cp * rho * geopotential_depth)
+    # print(dt_air.to_base_units())
+    print(tt)
+    print(solar_downwelling[-1], thermal_upwelling[-1],
+            solar_downwelling[-1] - thermal_upwelling[-1])
+
+    return dt_ground, dt_air, thermal_upwelling[-1]
+
+
+
+
+
+
+
+        
+
 
 
 

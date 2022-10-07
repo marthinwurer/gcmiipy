@@ -21,6 +21,9 @@ rd = 1.275 * units.kg * units.m ** -3
 # Specific heat of dry air
 Cp = 1004 * units.J * units.K ** -1 * units.kg ** -1
 
+# Heat capacity of dry ground (Hansen 1983, p.625)
+Cg = 1.13e6 * units.J * units.K ** -1 * units.m ** -3
+
 # potential temperature term
 kappa = Rd / Cp
 
