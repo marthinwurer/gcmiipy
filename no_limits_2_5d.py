@@ -467,11 +467,11 @@ def gen_initial_conditions(geom):
     p = np.full(surface, 1) * 100000 * units.Pa - geom.ptop
     u = np.full(full, 1) * 1.0 * units.m / units.s
     v = np.full(full, 1) * .0 * units.m / units.s
-    t = temperature.to_potential_temp(
-        np.full(full, 1) * standard_temperature,
-        p * geom.sig + geom.ptop
-    )
+    tt = np.full(full, 1) * standard_temperature
+    tp = p * geom.sig + geom.ptop
+    t = temperature.to_potential_temp(tt, tp)
     q = np.full(full, 1) * 0.000003 * units.kg * units.kg ** -1
+    q = unit_maximum(q, rh_to_mmr(manabe_rh(geom), tp, tt))
 
     # init ground
     gt = np.full(surface, 1) * standard_temperature
