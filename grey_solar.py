@@ -29,6 +29,14 @@ def mmr_from_vmr(vmr, mmg, mma):
 co2_mmr = mmr_from_vmr(300 / 1e6, M_CO2, Md)
 
 
+def daily_average_irradiance(lat, declination):
+    dH = np.arccos(-np.tan(lat) * np.tan(declination))
+    manabe64_Sc = 2 * 41840 * units.J * units.m ** -2 * units.minute ** -1
+    return manabe64_Sc / (math.pi * units.radian) * (dH * np.sin(lat) * np.sin(declination) + 
+            np.cos(lat) * np.cos(declination) * np.sin(dH))
+
+
+
 def solar_zenith_angle(latitude, hour_angle, declination):
     """
     from https://en.wikipedia.org/wiki/Solar_zenith_angle
@@ -53,7 +61,8 @@ Do single SW pass with ozone, clouds, and water, then both LW passes with CO2 an
 # also page 66
 h2o_weight = 0.125 * units.m ** 2 * units.kg ** -1
 liquid_weight = 5.0 * units.m ** 2 * units.kg ** -1
-co2_weight = 3.0 * units.m ** 2 * units.kg ** -1
+co2_weight = 1 * units.m ** 2 * units.kg ** -1
+co2_sw_weight = .01 * units.m ** 2 * units.kg ** -1
 
 ozone_weight = 0.01 * h2o_weight.u
 
@@ -180,15 +189,18 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
     solar_downwelling = np.zeros(flux_shape) * solar_constant.u
 
     # hour_angle = 
-
+    irradiance = daily_average_irradiance(35 * units.degrees, 0 * units.degrees)
+    irradiance = manabe64_Sc = 2 * 41840 * units.J * units.m ** -2 * units.minute ** -1
+    irradiance *= 0.5 * 0.5
     
     # zenith_angle = 
-    solar_downwelling[-1] = solar_constant * 0.25
+    solar_downwelling[-1] = irradiance
 
     oc = ozone_at(tp)
     sw_gasses = [
-        (oc, ozone_weight),
-        (q, h2o_weight),
+        # (oc, ozone_weight),
+        # (q, h2o_weight),
+        (co2_mmr, co2_sw_weight),
     ]
     sw_absorbance = compute_absorbance(sw_gasses, rho, path_length)
     sw_transmittance = 10 ** -sw_absorbance
@@ -196,13 +208,13 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
     sw_t_cloud = 10 ** -a_cloud
 
     lw_gasses = [
-        (q, h2o_weight),
+        # (q, h2o_weight),
         # TODO CO2 distribution
         (co2_mmr, co2_weight),
     ]
     lw_absorbance = compute_absorbance(lw_gasses, rho, path_length)
-    co2_absorbance = co2_mmr * rho * path_length * co2_weight
-    print("co2_absorbance", co2_absorbance[0], 1-10**-co2_absorbance[0])
+    # co2_absorbance = co2_mmr * rho * path_length * co2_weight
+    # print("co2_absorbance", co2_absorbance[0], 1-10**-co2_absorbance[0])
 
     # longwave just has emissivity at the same rate as absorbtion
     # I think for the cloud absorbance we can just convert the cloud thickness
@@ -215,7 +227,7 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
 
     lw_emissivity = 1 - 10 ** -lw_absorbance
     lw_cloud_emissivity = 1 - 10 ** -lw_cloud_absorbance
-    print("lw_emissivity", lw_emissivity[0])
+    print("lw_emissivity", lw_emissivity[10])
 
     emittance = sb_constant * tt ** 4 * ((1 - c) * lw_emissivity + c * lw_cloud_emissivity)
     # print("emittance")
@@ -281,11 +293,12 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
     
     dt_ground = (ground_absorbtion - ground_emittance) / Cg / (.1 * units.m)
     # print("ground t:", g.gt)
-    # print("ground dt:", dt_ground.to_base_units())
+    print("ground dt:", dt_ground.to_base_units())
+    print(ground_absorbtion, ground_emittance)
 
     dt_air = (absorbed - 2 * emittance) / (Cp * rho * geopotential_depth)
-    # print(dt_air.to_base_units())
-    print(tt)
+    # print(dt_air.to_base_units().to(units.K / units.hour))
+    # print(tt)
     print(solar_downwelling[-1], thermal_upwelling[-1],
             solar_downwelling[-1] - thermal_upwelling[-1])
 

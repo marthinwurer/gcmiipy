@@ -70,6 +70,14 @@ M_CO2 = 44.010 * units.g * units.mol ** -1
 # Stefan-Boltzmann constant
 sb_constant = 5.67e-8 * units.W * units.m ** -2 * units.K ** -4
 
+# Latent Heat (Enthalpy) of vaporization of water at 0c and 100c
+lhv_water_0c = 2.50e6 * units.J * units.kg ** -1
+lhv_water_100c = 2.25e6 * units.J * units.kg ** -1
+
+# Gas Constant for water vapor
+Rv = 461 * units.J * units.K ** -1 * units.kg ** -1
+
+
 
 """
 Functions for using units with numpy helper functions

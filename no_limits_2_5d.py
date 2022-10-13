@@ -327,9 +327,11 @@ def matsuno_timestep(p, u, v, t, q, dt, geom):
     return half_timestep(p, u, v, t, q, sp, su, sv, st, sq, dt, geom)
 
 
+old_t = standard_temperature
+
 def full_timestep(p, u, v, t, q, g, dt, geom):
     # atmosphere timestep
-    p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+    # p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
 
     # physics timestep
     # t_n, downwelling = grey_solar(p, q, t, 0.25, None, None, dt, geom)
@@ -337,7 +339,11 @@ def full_timestep(p, u, v, t, q, g, dt, geom):
     tt = temperature.to_true_temp(t, tp)
     dt_ground, dt_air, upwelling = grey_radiation(p, q, tt, 0.0, g, None, dt, geom)
     gt_n = g.gt + dt_ground * dt
+    gt_n = 275 * units.K
     tt_n = tt + dt_air * dt
+    global old_t
+    print(tt_n[-1] - old_t)
+    old_t = tt_n[-1]
     t_n = temperature.to_potential_temp(tt_n, tp)
     g_n = GroundVars(gt_n, g.gw, g.snow, g.ice)
     return p, u, v, t_n, q, g_n
@@ -371,10 +377,94 @@ PrognosticVars = namedtuple("PrognosticVars", ("p", "u", "v", "t", "q", "gt", "g
 GroundVars = namedtuple("GroundVars", ("gt", "gw", "snow", "ice"))
 
 
+def manabe_rh(geom):
+    # relative humidity distribution from Manabe 1967
+    rh = 0.77 * (geom.sig - 0.02) / (1 - 0.02)
+    return rh
+
+
+def saturation_vapor_pressure(tt):
+    # use the buck equation to estimate the svp
+    # https://en.wikipedia.org/wiki/Vapour_pressure_of_water#Accuracy_of_different_formulations
+    t = tt.to(units.celsius).m
+    return 0.61121 * units.kPa * np.exp((18.678 - t / 234.5) * (t / (257.14 + t)))
+
+
+def w_s_at(tp, tt):
+    e_s = saturation_vapor_pressure(tt)
+    w_s = (Rd / Rv) * e_s / (tp - e_s)
+    return w_s
+
+
+def vmr_from_mmr(mmr, mmg, mma):
+    return mma / mmg * mmr
+
+
+def rh_to_mmr(rh, tp, tt):
+    # using formulats from https://earthscience.stackexchange.com/a/5077
+    e_s = saturation_vapor_pressure(tt)
+
+    e = rh * e_s
+    # This doesn't work because I'm not using Clausius-Clapeyron, I'm using buck.
+    w = e * Rd / (Rv * (tp - e))
+    w_s = w_s_at(tp, tt)
+    # w = rh * w_s
+    q = w / (w + 1)
+    return q
+
+
+def mmr_to_rh(mmr, tp, tt):
+    e_s = saturation_vapor_pressure(tt)
+    # https://www.e-education.psu.edu/meteo300/node/519
+    # w is the water vapor mixing ratio: density of water over density of dry air without water
+    w = mmr / (1 - mmr)
+    # w = e * Rd / (Rv * (tp - e))
+    """
+    w = e * Rd / (Rv * (tp - e))
+    w = e * eps / (p - e)
+    w * (p - e) = e * eps
+    w * p - w * e = e * eps
+    w * p = e * eps + w * e
+    w * p = e * (eps + w)
+    w * p / (eps + w) = e
+    """ 
+    e = w * tp / (Rd / Rv + w)
+    # e = w * (p - 
+    # w_s = w_s_at(tp, tt)
+    # rh = w / w_s
+    rh = e / e_s
+    return rh
+
+
+def test_humidity_calcs():
+    # rh = 0.5
+    # t = units.Quantity(50, units.celsius).to_base_units()
+    # p = standard_pressure
+    # rho = (p / (constants.Rd * t)).to_base_units()
+    # mmr = rh_to_mmr(rh, p, t).to_base_units().m
+    # vmr = vmr_from_mmr(mmr, M_water, Md).to_base_units().m
+    # print(mmr, vmr, rho, rho * vmr, rho * mmr)
+    # exit()
+
+    for i in tqdm(range(101)):
+        t = units.Quantity(i, units.celsius).to_base_units()
+        for j in range(100):
+            p = (j + 1) * 10 * units.hPa
+            for k in range(10):
+                rh = (k + 1) / 10
+                mmr = rh_to_mmr(rh, p, t)
+                rh_back = mmr_to_rh(mmr, p, t)
+                within = np.abs(rh - rh_back) < 1e-6
+                if not within:
+                    print(rh, rh_back, mmr, t, p, saturation_vapor_pressure(t), w_s_at(p, t).to_base_units(), rh/w_s_at(p, t))
+                assert within
+
+
+
 def gen_initial_conditions(geom):
     full = (geom.layers, geom.height, geom.width)
     surface = (geom.height, geom.width)
-    p = np.full(surface, 1) * standard_pressure - geom.ptop
+    p = np.full(surface, 1) * 100000 * units.Pa - geom.ptop
     u = np.full(full, 1) * 1.0 * units.m / units.s
     v = np.full(full, 1) * .0 * units.m / units.s
     t = temperature.to_potential_temp(
@@ -382,6 +472,8 @@ def gen_initial_conditions(geom):
         p * geom.sig + geom.ptop
     )
     q = np.full(full, 1) * 0.000003 * units.kg * units.kg ** -1
+
+    # init ground
     gt = np.full(surface, 1) * standard_temperature
     gw = np.zeros(surface) * units.m
     snow = np.zeros(surface) * units.m
@@ -445,7 +537,7 @@ def run_model(height, width, layers, dt, timesteps, callback):
     geom = gen_geometry(height, width, layers)
     p, u, v, t, q, g = gen_initial_conditions(geom)
 
-    p[0, 0] *= 1.01
+    # p[0, 0] *= 1.01
 
     for i in tqdm(range(timesteps)):
         p, u, v, t, q, g = full_timestep(p, u, v, t, q, g, dt, geom)
@@ -471,14 +563,20 @@ def test_absorbtion_units():
     dp = 10 * units.hPa
 
 
+
 def main():
+    # test_humidity_calcs()
+    # exit()
+
+
     # run_model(height, width, layers, 60 * 15 * units.s, 1000, None)
     # p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 15 * units.s, 3, None)
-    p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 60 * units.s, 300, None)
+    p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 60 * 1 * units.s, 3000, None)
     print("ground temp:", g.gt)
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
     print("atmosphere temps:", tt)
+    print("pressures:", tp)
 
 
 if __name__ == "__main__":
