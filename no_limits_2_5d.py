@@ -23,7 +23,7 @@ from coordinates_3d import *
 from constants import *
 import temperature
 from geometry import *
-from grey_solar import grey_solar, grey_radiation
+from grey_solar import grey_solar, grey_radiation, basic_grey_radiation
 
 
 def calc_pu(p, u):
@@ -337,13 +337,21 @@ def full_timestep(p, u, v, t, q, g, dt, geom):
     # t_n, downwelling = grey_solar(p, q, t, 0.25, None, None, dt, geom)
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
+    dt_air, dt_ground = basic_grey_radiation(p, tp, tt, g, 0.1, 1, 0.3, geom)
+    gt_n = g.gt + dt_ground * dt
+    # gt_n = 275 * units.K
+    tt_n = tt + dt_air * dt
+    t_n = temperature.to_potential_temp(tt_n, tp)
+    g_n = GroundVars(gt_n, g.gw, g.snow, g.ice)
+    return p, u, v, t_n, q, g_n
+    tt_n = tt + dt_air * dt
+    t_n = temperature.to_potential_temp(tt_n, tp)
+    return p, u, v, t_n, q, g
+    exit()
     dt_ground, dt_air, upwelling = grey_radiation(p, q, tt, 0.0, g, None, dt, geom)
     gt_n = g.gt + dt_ground * dt
-    gt_n = 275 * units.K
+    # gt_n = 275 * units.K
     tt_n = tt + dt_air * dt
-    global old_t
-    print(tt_n[-1] - old_t)
-    old_t = tt_n[-1]
     t_n = temperature.to_potential_temp(tt_n, tp)
     g_n = GroundVars(gt_n, g.gw, g.snow, g.ice)
     return p, u, v, t_n, q, g_n
@@ -467,14 +475,16 @@ def gen_initial_conditions(geom):
     p = np.full(surface, 1) * 100000 * units.Pa - geom.ptop
     u = np.full(full, 1) * 1.0 * units.m / units.s
     v = np.full(full, 1) * .0 * units.m / units.s
-    tt = np.full(full, 1) * standard_temperature
+    # tt = np.full(full, 1) * standard_temperature
+    tt = np.full(full, 1) * 360 * units.K
     tp = p * geom.sig + geom.ptop
     t = temperature.to_potential_temp(tt, tp)
     q = np.full(full, 1) * 0.000003 * units.kg * units.kg ** -1
     q = unit_maximum(q, rh_to_mmr(manabe_rh(geom), tp, tt))
 
     # init ground
-    gt = np.full(surface, 1) * standard_temperature
+    # gt = np.full(surface, 1) * standard_temperature
+    gt = np.full(surface, 1) * 360 * units.K
     gw = np.zeros(surface) * units.m
     snow = np.zeros(surface) * units.m
     ice = np.zeros(surface) * units.m
@@ -571,7 +581,7 @@ def main():
 
     # run_model(height, width, layers, 60 * 15 * units.s, 1000, None)
     # p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 15 * units.s, 3, None)
-    p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 60 * 1 * units.s, 3000, None)
+    p, u, v, t, q, g, geom = run_model(1, 1, 20, 60 * 60 * 2 * units.s, 1200 * 12, None)
     print("ground temp:", g.gt)
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)

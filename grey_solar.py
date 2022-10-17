@@ -62,7 +62,8 @@ Do single SW pass with ozone, clouds, and water, then both LW passes with CO2 an
 h2o_weight = 0.125 * units.m ** 2 * units.kg ** -1
 liquid_weight = 5.0 * units.m ** 2 * units.kg ** -1
 co2_weight = 1 * units.m ** 2 * units.kg ** -1
-co2_sw_weight = .01 * units.m ** 2 * units.kg ** -1
+co2_sw_weight = 1 * units.m ** 2 * units.kg ** -1
+co2_sw_weight = co2_weight
 
 ozone_weight = 0.01 * h2o_weight.u
 
@@ -199,7 +200,7 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
     oc = ozone_at(tp)
     sw_gasses = [
         # (oc, ozone_weight),
-        # (q, h2o_weight),
+        (q, h2o_weight),
         (co2_mmr, co2_sw_weight),
     ]
     sw_absorbance = compute_absorbance(sw_gasses, rho, path_length)
@@ -208,7 +209,7 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
     sw_t_cloud = 10 ** -a_cloud
 
     lw_gasses = [
-        # (q, h2o_weight),
+        (q, h2o_weight),
         # TODO CO2 distribution
         (co2_mmr, co2_weight),
     ]
@@ -303,6 +304,192 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
             solar_downwelling[-1] - thermal_upwelling[-1])
 
     return dt_ground, dt_air, thermal_upwelling[-1]
+
+
+def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
+    """
+    implements the basic grey atmosphere from AD 2.7
+    needs dsig to be constant
+    """
+    # 2.35
+    e_n = 1 - t_lw ** (1 / geom.layers)
+    e_n_sw = 1 - t_sw ** (1 / geom.layers)
+    print(e_n)
+    print("tt", tt)
+
+    # 1) radiation emitted by each layer that reaches the surface
+    # equation 2.25
+    lw_transmittance = np.full(tt.shape, 1 - e_n)
+    sw_transmittance = np.full(tt.shape, 1 - e_n_sw)
+    emission = (1 - lw_transmittance) * sb_constant * tt ** 4
+    # print(emission)
+    cum_sw_trans_from_top = np.cumprod(sw_transmittance[::-1], axis=0)[::-1]
+    cum_lw_trans_from_top = np.cumprod(lw_transmittance[::-1], axis=0)[::-1]
+    cum_lw_trans_from_bottom = np.cumprod(lw_transmittance, axis=0)
+    # print(cum_lw_trans_from_bottom)
+    # print(cum_lw_trans_from_top)
+
+    clw_b_div = cum_lw_trans_from_bottom / lw_transmittance
+
+    # divide by transmittance to eliminate the current level's transmittance
+    # from the cumprod, becuase we only want the levels below
+    B = np.sum(emission * clw_b_div, axis=0)
+    # print("B", B)
+
+    # 2) radiation received from the sun
+    # equation 2.26
+    Sc = 342 * units.watt * units.m ** -2
+    S = (1 - albedo) * Sc * cum_sw_trans_from_top[0]
+    # print("S", S)
+
+    # 3) radiation emitted by the earth's surface
+    # equation 2.27
+    e_g = 1
+    U_s = e_g * sb_constant * g.gt ** 4
+    # print("U_s", U_s)
+
+    print("gt:", g.gt)
+    dt_ground = (B + S - U_s) / Cg / (.1 * units.m)
+    # print("dt_ground", dt_ground)
+    # or do we want to do the balance form of the equation to speed convergence?
+    # 2.28
+    # nah this seems to make the sim explode
+    # U_s = B + S
+    # gt = (U_s / (e_g * sb_constant)) ** (1/4)
+    # print(U_s)
+    # print(gt)
+
+    # now for the atomosphere
+
+    # long wave from above
+    LWA_a = None
+    # ok, can I make a matrix that gives the transmission from a layer to a layer?
+    """
+    something like
+      > to
+    \/ from
+    [[i1j1, i1j2, i1j2],
+     [i2j1, i2j2, i2j2],
+     [i3j1, i3j2, i3j2]]
+
+    Have cumlw as this and its inverse:
+    [[[0.1       ]]
+     [[0.17782794]]
+     [[0.31622777]]
+     [[0.56234133]]]
+
+    cumlw is:
+    up: [t1, t1t2, t1t2t3, t1t2t3t4]
+    dn: [t1t2t3t4, t2t3t4, t3t4, t4]
+    so we want up / dn_rolled?
+    dn_rolled: [0, t1t2t3t4, t2t3t4, t3t4]
+    nah
+    up_div: [1, t1, t1t2, t1t2t3]
+    up_div_rolled: [0, 1, t1, t1t2]
+    up_rolled: [0, t1, t1t2, t1t2t3]
+    up_rolled_div_T: [0, 1, t2, t2t3], [0, t1/t2, t1, t1t3]
+    [1, 0, 1, t3]
+    dn_rolled_dn: [t2t3t4, t3t4, t4, 0]
+    up_div_up_T: [1, t2, t2t3, t2t3t4], [t1/t2, 1, t3, t1t3ta4]
+    dn_div_up_T: [t2t3t4, t2t3t4/t1, t3t4/t1, t4/t1
+    dn_div_up_div_T: [t1t2t3t4, t3t4/t1, t4/t1t2, 1/t1t2t3
+    
+    up: [t1, t1t2, t1t2t3, t1t2t3t4]
+    dn: [t1t2t3t4, t2t3t4, t3t4, t4]
+    up_div_up_T_div_t: [1/t1, 1, t2, t2t3], [
+    upz: [0, t1, t1t2, t1t2t3, t1t2t3t4]
+    upz_div_upT: [0, 1, t2, t2t3], [0, 1/t2, 1, t3]
+
+
+
+
+    [[0, 1, t2, t2t3],
+     [1, 0, 1, t3],
+     [t2, 1, 0, 1],
+     [t2t3, t3, 1, 0],
+     
+    """
+
+    flux_shape = (geom.layers + 1, geom.height, geom.width)
+    upwelling = np.zeros(flux_shape) * Sc.u
+    downwelling = np.zeros(flux_shape) * Sc.u
+    # LWA_a = np.zeros(tt.shape) * Sc.u
+    # for f in range(1, geom.layers):
+        # for to in range(f):
+            # cum_trans = np.full(tt[0].shape, 1.0)
+            # for i in range(to+1, f):
+                # cum_trans *= lw_transmittance[i]
+# 
+            # LWA_a[to] += emission[f] * (1 - lw_transmittance[to]) * cum_trans
+            # LWA_a[to] += emission[f] * (1 - lw_transmittance[to]) * cum_lw_trans_from_top[to] / lw_transmittance[to] / cum_lw_trans_from_top[to]
+            # LWA_a[to] += emission[f] * (1 - lw_transmittance[to]) * cum_lw_trans_from_bottom[to] / lw_transmittance[to] / cum_lw_trans_from_bottom[to]
+
+
+    absorbed = np.zeros(tt.shape) * Sc.u
+    for i in reversed(range(geom.layers)):
+        absorbed[i] = downwelling[i+1] * (1 - lw_transmittance[i])
+        downwelling[i] = downwelling[i+1] * lw_transmittance[i] + emission[i]
+
+    LWA_a = absorbed
+
+    # print("LWA_a", LWA_a)
+    # print("LWA_b", LWA_b)
+    # print("serial", absorbed)
+    # exit()
+
+    # longwave from below
+    # LWA_b = np.zeros(tt.shape) * Sc.u
+    # for f in range(geom.layers):
+        # for to in range(f+1, geom.layers):
+            # cum_trans = np.full(tt[0].shape, 1.0)
+            # for i in range(f+1, to):
+                # cum_trans *= lw_transmittance[i]
+            # LWA_b[to] += emission[f] * (1 - lw_transmittance[to]) * cum_trans
+            # LWA_b[to] += emission[f] * (1 - lw_transmittance[to]) * cum_lw_trans_from_top[to] / lw_transmittance[to] / cum_lw_trans_from_top[to]
+            # LWA_b[to] += emission[f] * (1 - lw_transmittance[to]) * cum_lw_trans_from_bottom[to] / lw_transmittance[to] / cum_lw_trans_from_bottom[to]
+
+    absorbed = np.zeros(tt.shape) * Sc.u
+    for i in range(geom.layers):
+        absorbed[i] = upwelling[i] * (1 - lw_transmittance[i])
+        upwelling[i + 1] = upwelling[i] * lw_transmittance[i] + emission[i]
+
+    LWA_b = absorbed
+
+    # print("LWA_a", LWA_a)
+    # print("LWA_b", LWA_b)
+    # print("serial", absorbed)
+    # exit()
+
+    # absorbed terrestrial radiation
+    # 2.30
+    U_n = clw_b_div * U_s * (1 - lw_transmittance)
+    # print("U_n", U_n)
+
+    # absorbed solar radiation
+    # 2.31
+    S_n = (1 - sw_transmittance) * cum_sw_trans_from_top / sw_transmittance * Sc
+
+    # emitted longwave radiation
+    # 2.32
+    B_n = emission
+    # print("2B_n", 2*B_n)
+
+    # print(LWA_a.u, LWA_b.u, U_n.u, S_n.u, B_n.u)
+
+    # final temperature change
+    # 2.34
+    dTdt = (U_n + S_n - 2 * B_n + LWA_a + LWA_b) * (G / (Cp * p * geom.dsig))
+
+    # print(dTdt.to_base_units())
+    assert g.gt > 0 * units.K
+    assert g.gt < 600 * units.K
+    if(np.isnan(dTdt).any()):
+        print("nanananan")
+        exit()
+    # exit()
+    return dTdt, dt_ground
+
+
 
 
 

@@ -25,7 +25,16 @@ class Geom:
         self.heightmap = []
 
 
-def gen_geometry(height, width, layers):
+# functions for determining sigma 
+def manabe_sig(s):
+    return s ** 2 * (3 - 2 * s)
+
+
+def equal_sig(s):
+    return s
+
+
+def gen_geometry(height, width, layers, sig_func=equal_sig):
     """"""
     """
       DATA SIGE/    1.,.948665,.866530,.728953,.554415,.390144,
@@ -59,11 +68,8 @@ C**** CALCULATE DSIG AND DSIGO                                           816.
     geom = Geom(height, width, layers)
     mysig = []
 
-    def manabe_sig(s):
-        return s ** 2 * (3 - 2 * s)
-
     for i in range(layers+1):
-        mysig.append(manabe_sig(1 - i/(layers)))
+        mysig.append(sig_func(1 - i/(layers)))
 
     def rs(arr):
         return np.reshape(arr, (arr.shape[0], 1, 1))
