@@ -319,6 +319,28 @@ def basic_grey_transmittances(t_lw, t_sw, geom):
     return lw_transmittance, sw_transmittance
 
 
+def basic_3_gas_absorbance(p, tp, tt, rho, q, geom):
+    dp = p * geom.dsig
+    geopotential_depth = (dp / (rho * G)).to_base_units()
+    path_length = geopotential_depth
+
+    oc = ozone_at(tp)
+    sw_gasses = [
+        # (oc, ozone_weight),
+        # (q, h2o_weight), # page 51 in ad 2 says that this is just longwave
+    ]
+    sw_absorbance = compute_absorbance(sw_gasses, rho, path_length)
+
+    lw_gasses = [
+        (q, h2o_weight),
+        # TODO CO2 distribution
+        (co2_mmr, co2_weight),
+    ]
+    lw_absorbance = compute_absorbance(lw_gasses, rho, path_length)
+
+    return lw_absorbance, sw_absorbance
+
+
 def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     """
     implements the basic grey atmosphere from AD 2.7
@@ -449,7 +471,8 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     # print("LWA_a", LWA_a)
     # print("LWA_b", LWA_b)
     # print("serial", absorbed)
-    # exit()
+    print("B", B)
+    print("lowest", downwelling[0])
 
     # longwave from below
     # LWA_b = np.zeros(tt.shape) * Sc.u
@@ -469,15 +492,23 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
 
     LWA_b = absorbed
 
+
+    upwelling[0] = U_s
+    absorbed = np.zeros(tt.shape) * Sc.u
+    for i in range(geom.layers):
+        absorbed[i] = upwelling[i] * (1 - lw_transmittance[i])
+        upwelling[i + 1] = upwelling[i] * lw_transmittance[i] + emission[i]
+
     # print("LWA_a", LWA_a)
     # print("LWA_b", LWA_b)
     # print("serial", absorbed)
-    # exit()
 
     # absorbed terrestrial radiation
     # 2.30
     U_n = clw_b_div * U_s * (1 - lw_transmittance)
-    # print("U_n", U_n)
+    print("U_n plus", U_n + LWA_b)
+    print("both absorbed", absorbed)
+    exit()
 
     # absorbed solar radiation
     # 2.31
