@@ -306,6 +306,19 @@ def grey_radiation(p, q, tt, c, g, utc, dt, geom:Geom):
     return dt_ground, dt_air, thermal_upwelling[-1]
 
 
+def basic_grey_transmittances(t_lw, t_sw, geom):
+    # 2.35
+    e_n = 1 - t_lw ** (geom.dsig)
+    e_n_sw = 1 - t_sw ** (geom.dsig)
+    # print(geom.dsig)
+    # exit()
+
+    lw_transmittance = 1 - e_n
+    sw_transmittance = 1 - e_n_sw
+
+    return lw_transmittance, sw_transmittance
+
+
 def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     """
     implements the basic grey atmosphere from AD 2.7
@@ -316,11 +329,12 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     e_n_sw = 1 - t_sw ** (1 / geom.layers)
     print(e_n)
     print("tt", tt)
+    lw_transmittance, sw_transmittance = basic_grey_transmittances(t_lw, t_sw, geom)
 
     # 1) radiation emitted by each layer that reaches the surface
     # equation 2.25
-    lw_transmittance = np.full(tt.shape, 1 - e_n)
-    sw_transmittance = np.full(tt.shape, 1 - e_n_sw)
+    # lw_transmittance = np.full(tt.shape, 1 - e_n)
+    # sw_transmittance = np.full(tt.shape, 1 - e_n_sw)
     emission = (1 - lw_transmittance) * sb_constant * tt ** 4
     # print(emission)
     cum_sw_trans_from_top = np.cumprod(sw_transmittance[::-1], axis=0)[::-1]

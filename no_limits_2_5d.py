@@ -22,6 +22,7 @@ import low_pass
 from coordinates_3d import *
 from constants import *
 import temperature
+import geometry
 from geometry import *
 from grey_solar import grey_solar, grey_radiation, basic_grey_radiation
 
@@ -544,7 +545,7 @@ class TestBasicDiscretizaion(unittest.TestCase):
 
 
 def run_model(height, width, layers, dt, timesteps, callback):
-    geom = gen_geometry(height, width, layers)
+    geom = gen_geometry(height, width, layers, sig_func=geometry.manabe_sig)
     p, u, v, t, q, g = gen_initial_conditions(geom)
 
     # p[0, 0] *= 1.01
