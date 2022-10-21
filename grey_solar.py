@@ -40,15 +40,28 @@ def daily_average_irradiance(lat, declination):
 def solar_zenith_angle(latitude, hour_angle, declination):
     """
     from https://en.wikipedia.org/wiki/Solar_zenith_angle
+    returns cosine(zenith_angle)
     """
     return np.sin(latitude) * np.sin(declination) +\
             np.cos(latitude) * np.cos(declination) * np.cos(hour_angle)
 
 
-def zenith_angle(longs, lats, time):
-    # compute the hour angle
-    hour_angle = time / (24 * units.hours) * 360 * units.degrees
+def zenith_angle(longs, lats, time, geom):
+    # compute the hour angle (negative because sun moves west)
+    hour_angle = time / (-24 * units.hours) * 360 * units.degrees
+    # print(hour_angle)
     # tile the longs and lats to make the size
+    t_longs = np.tile(longs, (geom.height, 1))
+    # print(t_longs)
+    # print(lats)
+    t_lats = np.tile(lats, (1, geom.width))
+    # print(t_lats)
+    point_angle = t_longs + hour_angle
+    # print(point_angle)
+    sza = np.maximum(solar_zenith_angle(lats, point_angle, 0 * units.degrees), 0)
+    # print(sza)
+
+    return sza
 
 
 """
@@ -341,7 +354,7 @@ def basic_3_gas_absorbance(p, tp, tt, rho, q, geom):
     return lw_absorbance, sw_absorbance
 
 
-def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
+def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, utc, geom):
     """
     implements the basic grey atmosphere from AD 2.7
     needs dsig to be constant
@@ -349,8 +362,8 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     # 2.35
     e_n = 1 - t_lw ** (1 / geom.layers)
     e_n_sw = 1 - t_sw ** (1 / geom.layers)
-    print(e_n)
-    print("tt", tt)
+    # print(e_n)
+    # print("tt", tt)
     lw_transmittance, sw_transmittance = basic_grey_transmittances(t_lw, t_sw, geom)
 
     # 1) radiation emitted by each layer that reaches the surface
@@ -374,7 +387,9 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
 
     # 2) radiation received from the sun
     # equation 2.26
-    Sc = 342 * units.watt * units.m ** -2
+    sza = zenith_angle(geom.long, geom.lat, utc, geom)
+    # Sc = 342 * units.watt * units.m ** -2
+    Sc = solar_constant * sza
     S = (1 - albedo) * Sc * cum_sw_trans_from_top[0]
 
     # 3) radiation emitted by the earth's surface
@@ -383,7 +398,7 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     U_s = e_g * sb_constant * g.gt ** 4
     # print("U_s", U_s)
 
-    print("gt:", g.gt)
+    # print("gt:", g.gt)
     dt_ground = (B + S - U_s) / Cg / (.1 * units.m)
     # print("dt_ground", dt_ground)
     # or do we want to do the balance form of the equation to speed convergence?
@@ -478,10 +493,10 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     # print("LWA_a", LWA_a)
     # print("LWA_b", LWA_b)
     # print("serial", absorbed)
-    print("B", B)
-    print("lowest", downwelling[0])
-    print("S", S)
-    print("dw S", downwelling_sw[0] * (1 - albedo))
+    # print("B", B)
+    # print("lowest", downwelling[0])
+    # print("S", S)
+    # print("dw S", downwelling_sw[0] * (1 - albedo))
 
     # longwave from below
     # LWA_b = np.zeros(tt.shape) * Sc.u
@@ -516,15 +531,15 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     # absorbed terrestrial radiation
     # 2.30
     U_n = clw_b_div * U_s * (1 - lw_transmittance)
-    print("U_n plus", U_n + LWA_b)
-    print("both absorbed", absorbed_uw)
+    # print("U_n plus", U_n + LWA_b)
+    # print("both absorbed", absorbed_uw)
 
     # absorbed solar radiation
     # 2.31
     S_n = (1 - sw_transmittance) * cum_sw_trans_from_top / sw_transmittance * Sc
-    print("S_n plus", S_n)
-    print("absorbed_sw", absorbed_sw)
-    exit()
+    # print("S_n plus", S_n)
+    # print("absorbed_sw", absorbed_sw)
+    # exit()
 
     # emitted longwave radiation
     # 2.32
@@ -538,8 +553,8 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     dTdt = (U_n + S_n - 2 * B_n + LWA_a + LWA_b) * (G / (Cp * p * geom.dsig))
 
     # print(dTdt.to_base_units())
-    assert g.gt > 0 * units.K
-    assert g.gt < 600 * units.K
+    # assert g.gt > 0 * units.K
+    # assert g.gt < 600 * units.K
     if(np.isnan(dTdt).any()):
         print("nanananan")
         exit()

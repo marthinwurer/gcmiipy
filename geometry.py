@@ -102,8 +102,8 @@ C**** CALCULATE DSIG AND DSIGO                                           816.
         long_k[i] = -180 + (i+0.5) * dlong
 
 
-    geom.lat = lat_j
-    geom.long = long_k
+    geom.lat = lat_j.reshape((height, -1)) * units.degrees
+    geom.long = long_k * units.degrees
 
     cos_j = np.cos(lat_j * np.pi / 180)
     sin_j = np.sin(lat_j * np.pi / 180)
