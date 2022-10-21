@@ -338,7 +338,7 @@ def full_timestep(p, u, v, t, q, g, dt, geom):
     # t_n, downwelling = grey_solar(p, q, t, 0.25, None, None, dt, geom)
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
-    dt_air, dt_ground = basic_grey_radiation(p, tp, tt, g, 0.1, 1, 0.3, geom)
+    dt_air, dt_ground = basic_grey_radiation(p, tp, tt, g, 0.1, 0.9, 0.3, geom)
     gt_n = g.gt + dt_ground * dt
     # gt_n = 275 * units.K
     tt_n = tt + dt_air * dt

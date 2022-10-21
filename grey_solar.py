@@ -376,7 +376,6 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     # equation 2.26
     Sc = 342 * units.watt * units.m ** -2
     S = (1 - albedo) * Sc * cum_sw_trans_from_top[0]
-    # print("S", S)
 
     # 3) radiation emitted by the earth's surface
     # equation 2.27
@@ -449,6 +448,7 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     flux_shape = (geom.layers + 1, geom.height, geom.width)
     upwelling = np.zeros(flux_shape) * Sc.u
     downwelling = np.zeros(flux_shape) * Sc.u
+    downwelling_sw = np.zeros(flux_shape) * Sc.u
     # LWA_a = np.zeros(tt.shape) * Sc.u
     # for f in range(1, geom.layers):
         # for to in range(f):
@@ -461,18 +461,27 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
             # LWA_a[to] += emission[f] * (1 - lw_transmittance[to]) * cum_lw_trans_from_bottom[to] / lw_transmittance[to] / cum_lw_trans_from_bottom[to]
 
 
-    absorbed = np.zeros(tt.shape) * Sc.u
+    downwelling_sw[-1] = Sc
+    absorbed_dw = np.zeros(tt.shape) * Sc.u
+    absorbed_sw = np.zeros(tt.shape) * Sc.u
     for i in reversed(range(geom.layers)):
-        absorbed[i] = downwelling[i+1] * (1 - lw_transmittance[i])
+        # longwave
+        absorbed_dw[i] = downwelling[i+1] * (1 - lw_transmittance[i])
         downwelling[i] = downwelling[i+1] * lw_transmittance[i] + emission[i]
 
-    LWA_a = absorbed
+        # shortwave
+        absorbed_sw[i] = downwelling_sw[i+1] * (1 - sw_transmittance[i])
+        downwelling_sw[i] = downwelling_sw[i+1] * sw_transmittance[i]
+
+    LWA_a = absorbed_dw
 
     # print("LWA_a", LWA_a)
     # print("LWA_b", LWA_b)
     # print("serial", absorbed)
     print("B", B)
     print("lowest", downwelling[0])
+    print("S", S)
+    print("dw S", downwelling_sw[0] * (1 - albedo))
 
     # longwave from below
     # LWA_b = np.zeros(tt.shape) * Sc.u
@@ -494,9 +503,10 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
 
 
     upwelling[0] = U_s
-    absorbed = np.zeros(tt.shape) * Sc.u
+    absorbed_uw = np.zeros(tt.shape) * Sc.u
     for i in range(geom.layers):
-        absorbed[i] = upwelling[i] * (1 - lw_transmittance[i])
+        # longwave
+        absorbed_uw[i] = upwelling[i] * (1 - lw_transmittance[i])
         upwelling[i + 1] = upwelling[i] * lw_transmittance[i] + emission[i]
 
     # print("LWA_a", LWA_a)
@@ -507,12 +517,14 @@ def basic_grey_radiation(p, tp, tt, g, t_lw, t_sw, albedo, geom):
     # 2.30
     U_n = clw_b_div * U_s * (1 - lw_transmittance)
     print("U_n plus", U_n + LWA_b)
-    print("both absorbed", absorbed)
-    exit()
+    print("both absorbed", absorbed_uw)
 
     # absorbed solar radiation
     # 2.31
     S_n = (1 - sw_transmittance) * cum_sw_trans_from_top / sw_transmittance * Sc
+    print("S_n plus", S_n)
+    print("absorbed_sw", absorbed_sw)
+    exit()
 
     # emitted longwave radiation
     # 2.32
