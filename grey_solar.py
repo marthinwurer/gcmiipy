@@ -57,6 +57,7 @@ def zenith_angle(longs, lats, time, geom):
     t_lats = np.tile(lats, (1, geom.width))
     # print(t_lats)
     point_angle = t_longs + hour_angle
+    # point_angle = np.zeros(t_longs.shape) * units.degrees
     # print(point_angle)
     sza = np.maximum(solar_zenith_angle(lats, point_angle, 0 * units.degrees), 0)
     # print(sza)

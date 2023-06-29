@@ -7,7 +7,7 @@ units = pint.UnitRegistry()
 # from http://www.met.psu.edu/weather/other-resources/meteorological-measurements-units-and-conversions-1
 
 # Universal Gas Constant
-R = 8.3145e3 * units.J * units.K ** -1 * units.mol ** -1
+R = 8.3145 * units.J * units.K ** -1 * units.mol ** -1
 
 # Average Molecular Weight of Dry Air
 Md = 28.97 * units.g * units.mol ** -1

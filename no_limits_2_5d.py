@@ -31,12 +31,45 @@ from dynamics import *
 
 old_t = standard_temperature
 
+
+def calc_energy(p, u, v, t, q, g, geom):
+    """
+    https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2018MS001549
+    """
+    u_at_center = imh(u)
+    v_at_center = jmh(v)
+    mag = np.sqrt(u_at_center ** 2 + v_at_center ** 2)
+
+    tp = p * geom.sig + geom.ptop
+    tt = temperature.to_true_temp(t, tp)
+    rho = tp / (constants.Rd * tt)
+    dp = p * geom.dsig
+    geopotential_depth = (dp / (rho * G)).to_base_units()
+
+    airmass = rho * geopotential_depth * geom.area
+    
+
+    ke = mag ** 2 * .5 * airmass
+    ke = np.sum(ke).to(units.J)
+
+    ate = tt * Cp * airmass
+    ate = np.sum(ate).to(units.J)
+    return ke, ate
+
+
 def full_timestep(p, u, v, t, q, g, dt, utc, geom):
     # atmosphere timestep
+    # print("ke:", calc_energy(p, u, v, t, q, g, geom))
+    # exit()
     p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+    print("utc:", utc.to(units.days))
     print("u:", np.max(u), np.min(u))
     print("v:", np.max(v), np.min(v))
-    return p, u, v, t, q, g
+    # print("p:", p.m)
+    # print("u:", u.m)
+    print("ke:", calc_energy(p, u, v, t, q, g, geom))
+    # print("v:", v.m)
+    # return p, u, v, t, q, g
 
     # physics timestep
     # t_n, downwelling = grey_solar(p, q, t, 0.25, None, None, dt, geom)
@@ -49,10 +82,9 @@ def full_timestep(p, u, v, t, q, g, dt, utc, geom):
     t_n = temperature.to_potential_temp(tt_n, tp)
     g_n = GroundVars(gt_n, g.gw, g.snow, g.ice)
     # print("p:", p.m)
-    print("p:", np.max(p), np.min(p))
-    print("u:", np.max(u), np.min(u))
-    print("v:", np.max(v), np.min(v))
-    print("utc:", utc.to(units.days))
+    # print("p:", np.max(p), np.min(p))
+    # print("u:", np.max(u), np.min(u))
+    # print("v:", np.max(v), np.min(v))
     # print("u:", u.m)
     # print("v:", v.m)
     return p, u, v, t_n, q, g_n
@@ -175,6 +207,9 @@ def run_model(height, width, layers, dt, timesteps, callback):
     geom = gen_geometry(height, width, layers, sig_func=geometry.manabe_sig)
     p, u, v, t, q, g = gen_initial_conditions(geom)
     utc = 0 * units.hours
+    # u *= 0
+    v[0,0,0] = 0.1 * v.u
+    u *= 0
 
     # p[0, 0] *= 1.01
 
@@ -211,7 +246,7 @@ def main():
 
     # run_model(height, width, layers, 60 * 15 * units.s, 1000, None)
     # p, u, v, t, q, g, geom = run_model(1, 1, 18, 60 * 15 * units.s, 3, None)
-    p, u, v, t, q, g, geom = run_model(8, 16, 3, 60 * 30 * units.s, 1200 * 12, None)
+    p, u, v, t, q, g, geom = run_model(8, 8, 3, 60 * 30 * units.s, 1200 * 12, None)
     print("ground temp:", g.gt)
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
