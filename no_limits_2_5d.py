@@ -11,7 +11,7 @@ k is the vertical component
 """
 import math
 import unittest
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 
 import numpy as np
 from tqdm import tqdm
@@ -57,22 +57,10 @@ def calc_energy(p, u, v, t, q, g, geom):
     return ke, ate
 
 
-def full_timestep(p, u, v, t, q, g, dt, utc, geom):
-    # atmosphere timestep
-    # print("ke:", calc_energy(p, u, v, t, q, g, geom))
-    # exit()
-    p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
-    print("utc:", utc.to(units.days))
-    print("u:", np.max(u), np.min(u))
-    print("v:", np.max(v), np.min(v))
-    # print("p:", p.m)
-    # print("u:", u.m)
-    print("ke:", calc_energy(p, u, v, t, q, g, geom))
-    # print("v:", v.m)
-    # return p, u, v, t, q, g
+STATS = defaultdict(list)
 
-    # physics timestep
-    # t_n, downwelling = grey_solar(p, q, t, 0.25, None, None, dt, geom)
+
+def solar_timestep(t, p, g, dt, utc, geom):
     tp = p * geom.sig + geom.ptop
     tt = temperature.to_true_temp(t, tp)
     dt_air, dt_ground = basic_grey_radiation(p, tp, tt, g, 0.1, 0.9, 0.3, utc, geom)
@@ -81,6 +69,29 @@ def full_timestep(p, u, v, t, q, g, dt, utc, geom):
     tt_n = tt + dt_air * dt
     t_n = temperature.to_potential_temp(tt_n, tp)
     g_n = GroundVars(gt_n, g.gw, g.snow, g.ice)
+    return t_n, g_n
+
+
+
+def full_timestep(p, u, v, t, q, g, dt, utc, geom):
+    # atmosphere timestep
+    # print("ke:", calc_energy(p, u, v, t, q, g, geom))
+    # exit()
+    p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+    print("utc:", utc.to(units.days))
+    STATS["u_max"].append(np.max(u))
+    STATS["u_min"].append(np.min(u))
+    STATS["v_max"].append(np.max(v))
+    STATS["v_min"].append(np.min(v))
+    # print("p:", p.m)
+    # print("u:", u.m)
+    STATS["ke"].append(calc_energy(p, u, v, t, q, g, geom))
+    # print("ke:", calc_energy(p, u, v, t, q, g, geom))
+    # print("v:", v.m)
+    return p, u, v, t, q, g
+
+    # physics timestep
+    t_n, g_n = solar_timestep(t, p, g, dt, utc, geom)
     # print("p:", p.m)
     # print("p:", np.max(p), np.min(p))
     # print("u:", np.max(u), np.min(u))
@@ -154,53 +165,53 @@ def gen_initial_conditions(geom):
     return p, u, v, t, q, g
 
 
-class TestBasicDiscretizaion(unittest.TestCase):
-    def test_timestep_u_changes(self):
-        geom = gen_geometry(height, width, layers)
-        p, u, v, t, q, _ = gen_initial_conditions(geom)
-        dx = 100 * units.m
-        dt = 60 * 15 * units.s
-
-        # p[10, 10, 0] *= 1.01
-        # u[0, 3, 0] *= 200
-        # t[0, 3, 0] *= 1.0001
-        p[10, 10] *= 1.01
-        u[0, :, 12] *= 2
-        # u[:, 0, 3] *= 2
-        u[0, 0, 3] *= 2
-        # v[0, 18, 18] = 1 * units.m / units.s
-        # t[0, 3, 3] *= 1.1
-
-        # geom.heightmap[2, 3] = 2 * units.m
-        # u[3] *= 2
-        # ok, CFL for this is sqrt(2)/4
-
-        # t[2] += 1 * standard_temperature.units
-        # q[side_len//4:side_len//2] = 1
-        # q[2] = 1
-        # u[1] += .1 * u.units
-
-        # orig_u = u
-        # u = low_pass.avrx(u, geom)
-        # plt.imshow((orig_u - u).m)
-        # plt.ioff()
-        # plt.show()
-        # plt.plot(u[1])
-        # plt.plot(orig_u[1])
-        # plt.show()
-
-        plt.ion()
-        for i in tqdm(range(100000)):
-            p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
-
-            # plot_callback(temperature.to_true_temp(t, p).m)
-            # plot_callback((t[0]).m[ :, :])
-            plot_callback(p.m[:, :])
-            if np.isnan(u).any() != False:
-                break
-
-        plt.ioff()
-        plt.show()
+# class TestBasicDiscretizaion(unittest.TestCase):
+#     def test_timestep_u_changes(self):
+#         geom = gen_geometry(height, width, layers)
+#         p, u, v, t, q, _ = gen_initial_conditions(geom)
+#         dx = 100 * units.m
+#         dt = 60 * 15 * units.s
+#
+#         # p[10, 10, 0] *= 1.01
+#         # u[0, 3, 0] *= 200
+#         # t[0, 3, 0] *= 1.0001
+#         p[10, 10] *= 1.01
+#         u[0, :, 12] *= 2
+#         # u[:, 0, 3] *= 2
+#         u[0, 0, 3] *= 2
+#         # v[0, 18, 18] = 1 * units.m / units.s
+#         # t[0, 3, 3] *= 1.1
+#
+#         # geom.heightmap[2, 3] = 2 * units.m
+#         # u[3] *= 2
+#         # ok, CFL for this is sqrt(2)/4
+#
+#         # t[2] += 1 * standard_temperature.units
+#         # q[side_len//4:side_len//2] = 1
+#         # q[2] = 1
+#         # u[1] += .1 * u.units
+#
+#         # orig_u = u
+#         # u = low_pass.avrx(u, geom)
+#         # plt.imshow((orig_u - u).m)
+#         # plt.ioff()
+#         # plt.show()
+#         # plt.plot(u[1])
+#         # plt.plot(orig_u[1])
+#         # plt.show()
+#
+#         plt.ion()
+#         for i in tqdm(range(100000)):
+#             p, u, v, t, q = matsuno_timestep(p, u, v, t, q, dt, geom)
+#
+#             # plot_callback(temperature.to_true_temp(t, p).m)
+#             # plot_callback((t[0]).m[ :, :])
+#             plot_callback(p.m[:, :])
+#             if np.isnan(u).any() != False:
+#                 break
+#
+#         plt.ioff()
+#         plt.show()
 
 
 def run_model(height, width, layers, dt, timesteps, callback):
