@@ -47,14 +47,17 @@ def calc_energy(p, u, v, t, q, g, geom):
     geopotential_depth = (dp / (rho * G)).to_base_units()
 
     airmass = rho * geopotential_depth * geom.area
-    
+
+    total_depth = np.cumsum(geopotential_depth, 0)
+    geopotential = total_depth * airmass * G
+    geo = np.sum(geopotential).to(units.J)
 
     ke = mag ** 2 * .5 * airmass
     ke = np.sum(ke).to(units.J)
 
     ate = tt * Cp * airmass
     ate = np.sum(ate).to(units.J)
-    return ke, ate
+    return ke, ate, geo, ke+ate+geo
 
 
 STATS = defaultdict(list)
